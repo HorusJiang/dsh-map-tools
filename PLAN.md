@@ -12,9 +12,18 @@
 | M3 路径规划 4 工具 | ✅ | map_driving/transit/walking/bicycling_route |
 | M4 地理编码 + POI | ✅ | map_geocode / map_reverse_geocode / map_poi_search |
 | M5 本机端到端验证 | ✅ | headless 实测模型调用工具（OSRM 路线真实返回；Nominatim 不可达时降级引导生效） |
-| M6 发布 | 🔶 进行中 | GitHub 仓库已建（HorusJiang/dsh-map-tools）；npm 待登录发布；awesome-dsh-plugin 待满 1 天 + 10 commit 后提 PR |
+| M6 发布 | 🔶 进行中 | GitHub 仓库已建（HorusJiang/dsh-map-tools，11 commit，CI 绿）；**收录 PR 已提交**（[awesome-dsh-plugin#1842](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/1842)，gate 唯一未达标=仓库年龄，满 1 天自动通过）；git 安装链路已端到端验证（`dsh plugin add github:HorusJiang/dsh-map-tools` 可用）；**npm 发布待用户 `npm login`** |
 
-**测试**：26 个 vitest 单元测试（mock 网络）+ smoke + integration + amap-e2e（需 key），全部通过。
+**测试**：26 个 vitest 单元测试（mock 网络）+ smoke + integration + amap-e2e（需 key），全部通过；GitHub Actions CI（build + test）全绿。
+
+**发布状态明细**：
+
+| 项目 | 状态 |
+|---|---|
+| GitHub 仓库 | ✅ public，11 commit，`dsh-plugin` topic，`prepare` 脚本（git 安装可构建） |
+| 收录 PR | ✅ #1842 已提交，主 check 通过；等仓库满 1 天后 submission gate 自动通过 |
+| git 安装 | ✅ 已验证 `dsh plugin add github:HorusJiang/dsh-map-tools` 完整可用 |
+| npm 发布 | ⏳ 待用户 `npm login`（registry 需切官方源） |
 
 ---
 
