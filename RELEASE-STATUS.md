@@ -7,13 +7,13 @@
 | 项目 | 状态 | 证据 |
 |---|---|---|
 | 插件开发 | ✅ | 7 个工具（driving/transit/walking/bicycling route + geocode + reverse_geocode + poi_search），src/ 10 个源文件 |
-| 单元测试 | ✅ | 26 个 vitest 测试（tests/ 5 文件），全绿 |
+| 单元测试 | ✅ | 32 个 vitest 测试（tests/ 6 文件），全绿（2026-08-19 会话实测） |
 | 集成测试 | ✅ | scripts/integration.mjs：OSRM 真实路线返回 + Nominatim 降级引导 + transit key 引导 |
 | 冒烟测试 | ✅ | scripts/smoke.mjs：7 工具注册 + secret 脱敏 + 申请链接 |
 | GitHub CI | ✅ | .github/workflows/ci.yml（build + test）全绿 |
-| GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（14 commit，dsh-plugin topic，prepare 脚本） |
+| GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（26 commit，dsh-plugin topic，prepare 脚本，本地与 origin/master 同步） |
 | git 安装链路 | ✅ | `dsh plugin add github:HorusJiang/dsh-map-tools` 端到端可用（allowBuilds 引导正常） |
-| **npm 发布** | ✅ | **dsh-map-tools@0.1.0 已上线**（maintainers: horusj），`dsh plugin add dsh-map-tools` 安装验证通过 |
+| **npm 发布** | ✅ | **dsh-map-tools@0.3.1 已上线**（CHANGELOG 0.3.1 = 2026-08-19，`dsh plugin add dsh-map-tools` 安装验证通过） |
 | 收录 PR | ✅ | awesome-dsh-plugin#1842 已提交，mergeable CLEAN，主 check 通过 |
 | 一键发布脚本 | ✅ | scripts/publish.mjs（认证守卫 + registry 切换 + 构建 + 发布 + 验证） |
 
