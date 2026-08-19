@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.1] - 2026-08-19
+
+### Docs
+
+- Professional open-source documentation pass:
+  - Rewrote README.md / README.en.md: badges, install-option comparison, quick
+    start, architecture diagram, FAQ.
+  - Added SECURITY.md (key storage policy + vulnerability reporting).
+  - Added AGENTS.md (agent collaboration conventions).
+  - Added GitHub issue templates (bug / feature) and PR template.
+  - Expanded CONTRIBUTING.md with data-source, config and testing conventions.
+- package.json: added `author` and `bugs` fields.
+
 ## [0.3.0] - 2026-08-19
 
 ### Removed

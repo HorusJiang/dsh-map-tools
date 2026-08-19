@@ -1,51 +1,97 @@
 # dsh-map-tools
 
-[English](#english) | [中文](README.md)
+[中文](README.md) | English
 
-Map & routing tools plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search as native tools.
+Map & routing tools plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search as **native tools** — the model calls them directly, no MCP server required.
 
-- **Zero-config out of the box**: uses free OSM/OSRM/Nominatim data sources by default — no API key required.
-- **Upgrade path**: set an Amap (高德) Web Service key and the plugin automatically switches to Amap (best China coverage; enables transit and POI search). The settings card includes an "How to get an Amap key?" guide link.
-- **China-friendly**: clear Chinese fallback guidance when free providers are unreachable (e.g. Nominatim blocked on CN networks).
+[![npm version](https://img.shields.io/npm/v/dsh-map-tools)](https://www.npmjs.com/package/dsh-map-tools)
+[![npm downloads](https://img.shields.io/npm/dm/dsh-map-tools)](https://www.npmjs.com/package/dsh-map-tools)
+[![License](https://img.shields.io/npm/l/dsh-map-tools)](LICENSE)
+[![CI](https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/HorusJiang/dsh-map-tools/actions)
+[![dsh-plugin](https://img.shields.io/badge/dsh-plugin-installable-blue)](https://github.com/topics/dsh-plugin)
+
+---
+
+## Features
+
+- **7 native tools**: route planning (driving/transit/walking/bicycling), geocoding, reverse geocoding and POI search — called directly by the model via `map_*`.
+- **Amap (高德) data source (recommended)**: configure a free Amap Web Service key for the best China coverage (transit, POI, reliable Chinese geocoding).
+- **Zero-key fallback**: without a key, driving/walking/bicycling routes use free OSM/OSRM; Chinese address parsing degrades with clear guidance.
+- **Settings card out of the box**: Settings → Plugins → dsh-map-tools, graphical config with an "How to get an Amap key?" link; save applies instantly (no restart).
+- **China-network friendly**: clear Chinese guidance for unreachable free sources or invalid keys.
 
 ## Install
+
+Two ways, pick one:
+
+### Option 1: npm install (recommended, prebuilt, no build approval)
 
 ```sh
 dsh plugin --profile web add dsh-map-tools
 ```
 
-Or search `dsh-map-tools` in the plugin market (dshmarket) and click install. Restart `dsh web` after install (or wait for HMR hot-reload).
+### Option 2: from GitHub (source build, requires approval)
+
+```sh
+dsh plugin --profile web add github:HorusJiang/dsh-map-tools
+```
+
+> pnpm ≥10 asks you to explicitly allow the package's build script (`prepare`): add the printed package key to the profile's `pnpm-workspace.yaml` under `allowBuilds` and retry.
+
+Restart `dsh web` after install (or wait for HMR), then use the `map_*` tools in a session.
+
+> **Development mode**: `dsh plugin add <local-path>` installs via `link:`, so source edits take effect immediately — ideal for iterating on the plugin.
+
+## Quick start
+
+Configure an Amap key (~2 minutes):
+
+1. Open the [Amap console](https://console.amap.com/dev/key/app) → create an app → request a **"Web Service"** key (free for individuals).
+2. In DSH **Settings → Plugins → dsh-map-tools**, paste the key, set data source `amap`, save.
+3. Ask in a session:
+
+```
+Plan a driving route from Beijing South Station to Capital Airport T3
+Geocode "西湖区文三路478号" to coordinates
+Any gas stations within 1km of 116.397428,39.90923?
+```
 
 ## Tools
 
-| Tool | What it does | Default source | Amap source |
+| Tool | What it does | Free OSM | Amap |
 |---|---|---|---|
-| `map_driving_route` | Driving route planning | OSRM | ✅ |
-| `map_transit_route` | Transit planning | — (needs Amap key) | ✅ |
-| `map_walking_route` | Walking route planning | OSRM | ✅ |
-| `map_bicycling_route` | Bicycling route planning | OSRM | ✅ |
-| `map_geocode` | Address → coordinates | Nominatim | ✅ |
-| `map_reverse_geocode` | Coordinates → address | Nominatim | ✅ |
-| `map_poi_search` | POI search | — (needs Amap key) | ✅ |
+| `map_driving_route` | Driving route planning | ✅ | ✅ |
+| `map_transit_route` | Transit planning | — | ✅ |
+| `map_walking_route` | Walking route planning | ✅ | ✅ |
+| `map_bicycling_route` | Bicycling route planning | ✅ | ✅ |
+| `map_geocode` | Address → coordinates | CJK unreliable | ✅ |
+| `map_reverse_geocode` | Coordinates → address | CJK unreliable | ✅ |
+| `map_poi_search` | POI search | — | ✅ |
 
-Origin/destination accept either **address text** or **"lng,lat" coordinates** — the plugin normalizes automatically.
+Origin/destination accept either **address text** or **`"lng,lat"` coordinates** — the plugin normalizes automatically.
 
-## Configuration (optional)
+## Configuration
 
-Configure via the plugin settings card (Settings → Plugins → dsh-map-tools). The card reads/writes `~/.dsh-map-tools/config.json` through a loopback route — no restart needed:
+### Settings card (recommended)
+
+DSH **Settings → Plugins → dsh-map-tools** provides a graphical card: data-source selector, masked Amap key input, timeout, and apply link. Saving takes effect immediately.
+
+Config lives in **`~/.dsh-map-tools/config.json`** (0600), decoupled from the DSH settings document and shared across profiles:
 
 ```jsonc
 // ~/.dsh-map-tools/config.json
 {
-  "provider": "amap",          // amap | osm
-  "amapKey": "your-amap-web-service-key",
+  "provider": "amap",        // "amap" | "osm"
+  "amapKey": "your-amap-key",
   "timeoutMs": 15000
 }
 ```
 
-**Get an Amap key**: https://console.amap.com/dev/key/app → create an app → request a "Web Service" key (free for individual developers, daily quota).
+> Keys are only surfaced to the frontend as a boolean (`hasAmapKey`); the literal is **never echoed to the page or logs**.
 
-You can also provide defaults in `cordis.yml` (config-file values win):
+### cordis.yml defaults
+
+Defaults can be provided in the profile's `cordis.yml` (**config-file values win over cordis.yml**):
 
 ```yaml
 - id: map-tools
@@ -54,19 +100,57 @@ You can also provide defaults in `cordis.yml` (config-file values win):
     provider: amap
 ```
 
-## Examples
+## Architecture
 
 ```
-Plan a driving route from Beijing South Station to Capital Airport T3
-Geocode "西湖区文三路478号" to coordinates
-Any gas stations within 1km of 116.397428,39.90923?
+┌─ Model ─────────────────────────────────────┐
+│  map_driving_route / map_geocode / ...      │  7 native tools (ctx.tools)
+└──────────────┬──────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────┐
+│  src/tools/    tool definitions (validate+render) │
+│  src/clients/  provider clients              │
+│    amap.ts      Amap Web Service API (recommended) │
+│    osrm.ts      OSRM free routing (fallback)       │
+│    photon.ts    Photon free geocoding (fallback)   │
+│    nominatim.ts Nominatim free geocoding (fallback)│
+└──────────────┬──────────────────────────────┘
+               │
+┌──────────────▼──────────────────────────────┐
+│  src/config-file.ts  ~/.dsh-map-tools/config.json (0600) │
+│  src/config-route.ts loopback route /dsh-map-tools/config │
+│  src/settings-ns.ts   settings namespace registration    │
+│  client/client.js     settings card (hand-written, zero-dep)│
+└──────────────────────────────────────────────┘
 ```
+
+- **Config priority**: config file (settings card) → `cordis.yml` defaults.
+- **Instant apply**: tools rebuild on config change; no restart.
+- **No MCP**: all capabilities are native tools; no external MCP server process.
 
 ## Data sources
 
-- **OSRM** (router.project-osrm.org): free public routing for driving/walking/cycling; rate-limited public server, default fallback.
-- **Nominatim** (nominatim.openstreetmap.org): free public geocoding, 1 QPS limit; **may be unreachable on some CN networks** — the geocoding tools return Chinese guidance in that case.
-- **Amap (高德)**: best China data (routing/geocoding/POI/transit); requires a free key, highest quality once configured.
+| Source | Use | Key | Notes |
+|---|---|---|---|
+| Amap (高德) | All tools (recommended) | Free | Best China coverage: transit, POI, Chinese geocoding |
+| OSRM | driving/walking/bicycling routes | none | Free public server, rate-limited |
+| Photon / Nominatim | geocoding | none | Free public; **CJK unreliable**, unreachable on some networks |
+
+> Free-source limitations (unstable CJK geocoding) are deliberate: without a key you get clear guidance; with an Amap key the experience upgrades seamlessly.
+
+## FAQ
+
+**Q: I configured an Amap key but routes still use OSM?**
+A: Check the config file's `provider` is `amap` (not `osm`) and `amapKey` is non-empty.
+
+**Q: Why do transit/POI require a key?**
+A: Free OSM sources don't provide transit or POI data; those need the Amap key.
+
+**Q: My Amap key is rejected?**
+A: Make sure it's a **"Web Service"** key (not JS API / Web key), and the services are enabled in the Amap console.
+
+**Q: Chinese geocoding reports "free source unavailable"?**
+A: Free sources (Photon/Nominatim) handle Chinese poorly and may be unreachable on some CN networks. This is by design — configure an Amap key and it resolves.
 
 ## Development
 
@@ -75,18 +159,31 @@ pnpm install
 pnpm run build                # tsc → lib/
 pnpm test                     # vitest unit tests (mocked network)
 node scripts/smoke.mjs        # smoke: 7 tools register
-node scripts/integration.mjs  # integration: real network requests
-node scripts/amap-e2e.mjs     # Amap e2e (set AMAP_API_KEY)
+node scripts/integration.mjs  # integration: real requests (free sources)
+node scripts/amap-e2e.mjs     # Amap e2e: set AMAP_API_KEY
+node scripts/config-e2e.mjs   # config file round-trip
 ```
+
+Conventions: see [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
 ## Publishing
 
 ```sh
 npm config set registry https://registry.npmjs.org/
-npm login
-node scripts/publish.mjs      # one-shot publish (build + pack check + publish + verify)
+npm login                     # npm account (a bypass-2FA publish token is recommended)
+node scripts/publish.mjs      # one-shot: build → pack check → publish → verify
 ```
+
+Versioning follows [SemVer](https://semver.org/); changes are tracked in [CHANGELOG.md](CHANGELOG.md).
+
+## Security
+
+Key storage and vulnerability reporting: see [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Issues and PRs welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for conventions.
 
 ## License
 
-MIT
+[MIT](LICENSE) © HorusJiang
