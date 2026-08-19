@@ -78,6 +78,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "prepare": "npm run build",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "postinstall": "node scripts/install-hooks.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs"
   }
 }
