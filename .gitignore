@@ -1,8 +1,29 @@
+# ===== 敏感配置（绝不提交——含 API key） =====
+# 运行时的 API 配置存放在用户目录 ~/.dsh-map-tools/config.json（不在仓库内）。
+# 以下路径是双保险：即使有人把配置复制进工作区，也不会被 git 跟踪。
+.dsh-map-tools/
+config.json
+config*.local.json
+*.config.json
+
+# 环境变量 / 密钥
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+secrets/
+
 # Dependencies
 node_modules/
 
 # Build output
 lib/
+
+# Test / coverage output
+coverage/
+.vitest/
 
 # Logs
 *.log
@@ -15,6 +36,5 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 
-# Local env
-.env
-.env.local
+# Local reference files
+.contributing.md
