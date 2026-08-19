@@ -21,21 +21,36 @@ import { registerPoiTool } from './tools/poi.js'
 import { parseLngLat, type LngLat } from './types.js'
 import { Config } from './config.js'
 import type { Config as ConfigType } from './config.js'
-import { installMapSettings } from './settings.js'
+import { readConfig } from './config-file.js'
+import { installConfigRoute } from './config-route.js'
+import { installSettingsNamespace } from './settings-ns.js'
 
 export const name = 'dsh-map-tools'
 export const inject = ['tools']
 export { Config }
 
-/** Build (or rebuild) the provider clients from a config. */
+/** Build (or rebuild) the provider clients. Priority: config-file (settings
+ * card) → schema defaults. */
 function buildClients(config: ConfigType) {
-  const timeoutMs = config.timeoutMs
-  // Provider selection: exactly one primary source per config.provider.
-  const amap = config.provider === 'amap' && config.amapKey
-    ? new AmapClient({ key: config.amapKey, timeoutMs })
+  // The settings card writes ~/.dsh-map-tools/config.json; when it holds
+  // values, they win over the composition-entry schema defaults.
+  let fileConfig: import('./config-file.js').MapToolsFileConfig = {}
+  try {
+    fileConfig = readConfig()
+  } catch (error) {
+    console.error(`[dsh-map-tools] config read failed, using schema defaults: ${error}`)
+  }
+  const provider = fileConfig.provider ?? config.provider
+  const amapKey = fileConfig.amapKey ?? config.amapKey
+  const baiduAk = fileConfig.baiduAk ?? config.baiduAk
+  const timeoutMs = fileConfig.timeoutMs ?? config.timeoutMs
+
+  // Provider selection: exactly one primary source per provider.
+  const amap = provider === 'amap' && amapKey
+    ? new AmapClient({ key: amapKey, timeoutMs })
     : undefined
-  const baidu = config.provider === 'baidu' && config.baiduAk
-    ? new BaiduClient({ ak: config.baiduAk, timeoutMs })
+  const baidu = provider === 'baidu' && baiduAk
+    ? new BaiduClient({ ak: baiduAk, timeoutMs })
     : undefined
   const osrm = new OsrmClient({ timeoutMs })
   const nominatim = new NominatimClient({
@@ -99,20 +114,22 @@ function registerAll(ctx: Context, clients: ReturnType<typeof buildClients>): ()
 }
 
 export function apply(ctx: Context, config: ConfigType): void {
-  // Keep one live config object; settings changes mutate it in place.
-  const liveConfig: ConfigType = { ...config }
-
   // Register tools under an effect: Cordis runs the returned disposer both on
   // explicit reload (we call it) and on plugin unload (fiber disposal).
   let disposeTools = () => {}
   ctx.effect(() => {
-    disposeTools = registerAll(ctx, buildClients(liveConfig))
+    disposeTools = registerAll(ctx, buildClients(config))
     return () => disposeTools()
   })
 
-  // When settings change, tear down old tool registrations and rebuild.
-  installMapSettings(ctx, liveConfig, () => {
+  const reload = (): void => {
     disposeTools()
-    disposeTools = registerAll(ctx, buildClients(liveConfig))
-  })
+    disposeTools = registerAll(ctx, buildClients(config))
+  }
+
+  // The settings card route + namespace (modlens pattern): the card reads and
+  // writes ~/.dsh-map-tools/config.json through the loopback route, and the
+  // tools rebuild on a change.
+  installConfigRoute(ctx)
+  installSettingsNamespace(ctx, config, reload)
 }
