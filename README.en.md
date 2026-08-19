@@ -4,13 +4,12 @@
 
 # dsh-map-tools
 
-<p align="center">[中文](README.md) | English</p>
+<p align="center"><a href="README.md">中文</a> | English</p>
 
-<p align="center">Map & routing tools plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search as **native tools** — the model calls them directly, no MCP server required.</p>
+<p align="center">Map &amp; routing tools plugin for <a href="https://github.com/deepseek-ai/deepseek-harness">DeepSeek Harness</a>: driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search as <strong>native tools</strong> — the model calls them directly, no MCP server required.</p>
 
 <p align="center">
   <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/v/dsh-map-tools?style=flat-square&label=npm&color=cb3837" alt="npm"></a>
-  <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/dm/dsh-map-tools?style=flat-square" alt="downloads"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
   <a href="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml"><img src="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-installable-2A6BE8?style=flat-square" alt="dsh-plugin"></a>
