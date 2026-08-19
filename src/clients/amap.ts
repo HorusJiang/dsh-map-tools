@@ -3,7 +3,7 @@
 import type { GeocodeResult, LngLat, PoiResult, RouteResult, RouteStep } from '../types.js'
 import { formatLngLat } from '../types.js'
 
-const REST = 'https://restapi.amap.com'
+const REST = 'https://restapi.amap.com/'
 
 /** Shared fetch helper: GET with key + params, JSON response, abortable, timeout-bounded. */
 async function get<T>(
@@ -37,7 +37,13 @@ async function get<T>(
   if (!res.ok) throw new Error(`Amap HTTP ${res.status}: ${res.statusText}`)
   const body = (await res.json()) as { status?: string; info?: string; infocode?: string; [k: string]: unknown }
   if (body.status === '1') return body as T
-  throw new Error(`Amap API error ${body.infocode ?? '?'}: ${body.info ?? 'unknown'}`)
+  const infocode = body.infocode ?? '?'
+  const info = body.info ?? 'unknown'
+  // Key-related errors are the most common user mistake — guide them to fix it.
+  if (infocode === '10001' || infocode === '10003' || /INVALID_USER_KEY|USER_KEY_PLAT_NOMATCH/i.test(info)) {
+    throw new Error(`高德 key 无效或未生效（${infocode}: ${info}）。请检查插件配置中的 amapKey 是否正确，或前往 https://console.amap.com/dev/key/app 重新申请。`)
+  }
+  throw new Error(`Amap API error ${infocode}: ${info}`)
 }
 
 /** Amap v5 driving/walking/bicycling direction response shape (subset). */

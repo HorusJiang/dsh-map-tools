@@ -40,8 +40,8 @@
   "homepage": "https://github.com/HorusJiang/dsh-map-tools#readme",
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.5",
-    "@deepseek-ai/dsh-settings": "^0.1.0-rc.5"
+    "@deepseek-ai/dsh-settings": "^0.1.0-rc.5",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.5"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1"
@@ -51,7 +51,8 @@
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.5",
     "@deepseek-ai/schemastery": "^3.18.1",
     "@types/node": "^22.0.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
@@ -63,6 +64,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
     "prepack": "npm run build"
   }
 }
