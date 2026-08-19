@@ -38,3 +38,6 @@ Thumbs.db
 
 # Local reference files
 .contributing.md
+
+# Local session handoff (not for public repo)
+PROJECT-SNAPSHOT.md
