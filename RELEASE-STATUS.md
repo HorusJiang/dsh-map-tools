@@ -11,25 +11,13 @@
 | 集成测试 | ✅ | scripts/integration.mjs：OSRM 真实路线返回 + Nominatim 降级引导 + transit key 引导 |
 | 冒烟测试 | ✅ | scripts/smoke.mjs：7 工具注册 + secret 脱敏 + 申请链接 |
 | GitHub CI | ✅ | .github/workflows/ci.yml（build + test）全绿 |
-| GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（13 commit，dsh-plugin topic，prepare 脚本） |
+| GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（14 commit，dsh-plugin topic，prepare 脚本） |
 | git 安装链路 | ✅ | `dsh plugin add github:HorusJiang/dsh-map-tools` 端到端可用（allowBuilds 引导正常） |
+| **npm 发布** | ✅ | **dsh-map-tools@0.1.0 已上线**（maintainers: horusj），`dsh plugin add dsh-map-tools` 安装验证通过 |
 | 收录 PR | ✅ | awesome-dsh-plugin#1842 已提交，mergeable CLEAN，主 check 通过 |
 | 一键发布脚本 | ✅ | scripts/publish.mjs（认证守卫 + registry 切换 + 构建 + 发布 + 验证） |
 
-## 待办 1：npm 发布（阻塞于用户操作）
-
-**阻塞原因**：npm 未登录（`npm whoami` → ENEEDAUTH），且无现有 token。登录凭据只能用户本人操作。
-
-**用户操作**（完成后即发布）：
-```sh
-npm config set registry https://registry.npmjs.org/
-npm login
-node scripts/publish.mjs   # 一键完成：构建 → 打包检查 → 发布 → 验证
-```
-
-**备选**（如果不发布 npm）：git 安装链路已验证可用，收录规范允许 git/tarball 形式，npm 发布为增强项非必需。
-
-## 待办 2：收录 gate 最终通过（阻塞于时间）
+## 待办：收录 gate 最终通过（阻塞于时间）
 
 **阻塞原因**：仓库须满 1 天（首次 commit 2026-08-19 10:48），gate 的 `MIN_AGE_DAYS = 1` 是硬性 CI 检查。
 
@@ -42,13 +30,14 @@ node scripts/publish.mjs   # 一键完成：构建 → 打包检查 → 发布 �
 
 ```sh
 # 检查外部条件
-npm whoami                                   # 若已登录 → node scripts/publish.mjs
+npm whoami                                   # 已登录（horusj），npm 发布已完成
 gh pr checks 1842 --repo awesome-dsh-plugin/awesome-dsh-plugin   # 检查收录 gate
 ```
 
 ## 关键链接
 
 - 插件仓库：https://github.com/HorusJiang/dsh-map-tools
+- npm 包：https://www.npmjs.com/package/dsh-map-tools
 - 收录 PR：https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/1842
 - 收录条目：docs/awesome-dsh-plugin-submission.yml
 - 高德 key 申请：https://console.amap.com/dev/key/app
