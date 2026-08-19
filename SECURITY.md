@@ -22,6 +22,20 @@ versions receive fixes only when a security issue is backported explicitly.
 - Keys are stored per-machine (never synced through DSH settings documents or
   any cloud store).
 
+## Leak protection (defense in depth)
+
+Three layers keep keys out of the repository:
+
+1. **Storage location**: keys live in `~/.dsh-map-tools/config.json`, outside
+   any git working tree by design.
+2. **`.gitignore`**: `config.json`, `.dsh-map-tools/`, `.env` and key files are
+   ignored — even a copy dropped into the workdir is never tracked.
+3. **Pre-commit hook**: `scripts/check-secrets.mjs` scans staged files for
+   key-shaped values (e.g. `"amapKey":"<32-hex>"`) and **refuses the commit**
+   on a hit. The hook installs via `scripts/install-hooks.mjs` on
+   `postinstall` for contributors (never for npm consumers). Run manually with
+   `pnpm check:secrets`.
+
 ## Reporting a vulnerability
 
 If you find a security issue — especially anything that could leak the stored

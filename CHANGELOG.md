@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- Pre-commit secret guard: `scripts/check-secrets.mjs` scans staged files for
+  key-shaped values and refuses the commit on a hit; installed via
+  `scripts/install-hooks.mjs` (`postinstall`, contributors only). Defense in
+  depth behind `.gitignore` hardening.
+- `.gitignore` hardened: `config.json`, `.dsh-map-tools/`, `.env` and key
+  files are now ignored.
+
 ## [0.3.1] - 2026-08-19
 
 ### Docs

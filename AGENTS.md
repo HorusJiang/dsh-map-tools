@@ -90,3 +90,4 @@ node scripts/smoke.mjs   # 7 工具注册检查
 - 不把 key 写入代码、README 示例或任何可提交文件。
 - 不改动 `cordis.patch.yml` 的插件 id（`map-tools`）——影响已安装用户。
 - 不引入百度/其他需要额外白名单配置的数据源。
+- 不在仓库内创建 `config.json` / `.env` / 密钥文件；pre-commit 钩子会拦截含 key 的提交（`scripts/check-secrets.mjs`）。修改钩子后必须验证：假 key 提交被拒、正常提交放行。
