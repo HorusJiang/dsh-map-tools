@@ -4,12 +4,10 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { AmapClient } from '../clients/amap.js'
-import type { BaiduClient } from '../clients/baidu.js'
 import { parseLngLat } from '../types.js'
 
 export interface PoiClients {
   amap?: AmapClient
-  baidu?: BaiduClient
   /** Resolve an address (or `lng,lat`) to coordinates; throws with a helpful message. */
   resolve: (text: string, signal: AbortSignal) => Promise<[number, number]>
 }
@@ -71,49 +69,28 @@ export function registerPoiTool(ctx: Context, clients: PoiClients, disposers: Ar
         },
       },
       async execute(args: { keywords: string; location?: string; radiusM?: number; region?: string; types?: string }, exec: ToolRunContext) {
-        if (clients.amap) {
-          let results
-          if (args.location) {
-            const center = parseLngLat(args.location) ?? (await clients.resolve(args.location, exec.signal))
-            results = await clients.amap.poiAround(center, args.keywords, {
-              radiusM: args.radiusM ?? 1000,
-              types: args.types,
-            }, exec.signal)
-          } else {
-            results = await clients.amap.poiSearch(args.keywords, { region: args.region, cityLimit: !!args.region }, exec.signal)
-          }
-          return {
-            count: results.length,
-            results: results.map((r) => ({
-              name: r.name,
-              location: r.location,
-              type: r.type,
-              address: r.address,
-              tel: r.tel,
-              distanceM: r.distanceM,
-            })),
-          }
+        if (!clients.amap) throw new Error('POI 搜索需要配置高德 amapKey。申请：https://console.amap.com/dev/key/app')
+        let results
+        if (args.location) {
+          const center = parseLngLat(args.location) ?? (await clients.resolve(args.location, exec.signal))
+          results = await clients.amap.poiAround(center, args.keywords, {
+            radiusM: args.radiusM ?? 1000,
+            types: args.types,
+          }, exec.signal)
+        } else {
+          results = await clients.amap.poiSearch(args.keywords, { region: args.region, cityLimit: !!args.region }, exec.signal)
         }
-        if (clients.baidu) {
-          let results
-          if (args.location) {
-            const center = parseLngLat(args.location) ?? (await clients.resolve(args.location, exec.signal))
-            results = await clients.baidu.poiSearch(args.keywords, { location: center, radiusM: args.radiusM ?? 1000 }, exec.signal)
-          } else {
-            results = await clients.baidu.poiSearch(args.keywords, { region: args.region }, exec.signal)
-          }
-          return {
-            count: results.length,
-            results: results.map((r) => ({
-              name: r.name,
-              location: r.location,
-              address: r.address,
-              tel: r.tel,
-              distanceM: r.distanceM,
-            })),
-          }
+        return {
+          count: results.length,
+          results: results.map((r) => ({
+            name: r.name,
+            location: r.location,
+            type: r.type,
+            address: r.address,
+            tel: r.tel,
+            distanceM: r.distanceM,
+          })),
         }
-        throw new Error('POI 搜索需要配置高德 amapKey 或百度 baiduAk。高德申请：https://console.amap.com/dev/key/app；百度申请：https://lbsyun.baidu.com/apiconsole/key')
       },
     }),
   ))

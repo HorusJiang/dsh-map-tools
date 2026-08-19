@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-08-19
+
+### Removed
+
+- **Baidu Maps provider removed**: the Baidu JS-API ak cannot be used for
+  server-side calls (requires a separate 服务端 application with IP whitelist),
+  so the module was removed per request. `provider` is now `amap | osm`.
+- Removed `baiduAk` config, BaiduClient, and all baidu dispatch branches.
+
+### Fixed
+
+- Settings card (client half) now shows only the Amap key field with the apply
+  link; no dead Baidu controls.
+
 ## [0.2.0] - 2026-08-19
 
 ### Added

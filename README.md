@@ -18,15 +18,15 @@ dsh plugin --profile web add dsh-map-tools
 
 ## 工具
 
-| 工具 | 功能 | OSM 免费源 | 高德 | 百度 |
-|---|---|---|---|---|
-| `map_driving_route` | 驾车路线规划 | ✅ | ✅ | ✅ |
-| `map_transit_route` | 公交/地铁换乘 | — | ✅ | ✅ |
-| `map_walking_route` | 步行路线规划 | ✅ | ✅ | ✅ |
-| `map_bicycling_route` | 骑行路线规划 | ✅ | ✅ | ✅ |
-| `map_geocode` | 地址 → 经纬度 | 中文不可靠 | ✅ | ✅ |
-| `map_reverse_geocode` | 经纬度 → 地址 | 中文不可靠 | ✅ | ✅ |
-| `map_poi_search` | 兴趣点搜索 | — | ✅ | ✅ |
+| 工具 | 功能 | OSM 免费源 | 高德 |
+|---|---|---|---|
+| `map_driving_route` | 驾车路线规划 | ✅ | ✅ |
+| `map_transit_route` | 公交/地铁换乘 | — | ✅ |
+| `map_walking_route` | 步行路线规划 | ✅ | ✅ |
+| `map_bicycling_route` | 骑行路线规划 | ✅ | ✅ |
+| `map_geocode` | 地址 → 经纬度 | 中文不可靠 | ✅ |
+| `map_reverse_geocode` | 经纬度 → 地址 | 中文不可靠 | ✅ |
+| `map_poi_search` | 兴趣点搜索 | — | ✅ |
 
 起点/终点统一接受 **地址文本** 或 **"lng,lat" 坐标** 两种形式，插件自动归一化。
 
@@ -37,16 +37,13 @@ dsh plugin --profile web add dsh-map-tools
 ```jsonc
 // ~/.dsh-map-tools/config.json
 {
-  "provider": "amap",          // amap | baidu | osm
-  "amapKey": "你的高德Web服务key",  // 二选一
-  "baiduAk": "你的百度服务端ak",     // 或二选一
+  "provider": "amap",          // amap | osm
+  "amapKey": "你的高德Web服务key",
   "timeoutMs": 15000
 }
 ```
 
-**获取 Key**：
-- 高德：[https://console.amap.com/dev/key/app](https://console.amap.com/dev/key/app)（创建应用 → "Web 服务"类型，免费）
-- 百度：[https://lbsyun.baidu.com/apiconsole/key](https://lbsyun.baidu.com/apiconsole/key)（创建应用 → "服务端"类型，免费）
+**获取高德 Key**：[https://console.amap.com/dev/key/app](https://console.amap.com/dev/key/app)（创建应用 → "Web 服务"类型，免费）
 
 也可以在 `cordis.yml` 中提供默认值（配置文件中的值优先）：
 

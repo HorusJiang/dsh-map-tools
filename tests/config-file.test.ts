@@ -37,12 +37,11 @@ describe('config-file', () => {
   })
 
   it('summary never echoes secret values', () => {
-    applyConfig({ provider: 'baidu', baiduAk: 'super-secret-ak' })
+    applyConfig({ provider: 'amap', amapKey: 'super-secret-key' })
     const summary = configSummary()
-    expect(summary.hasBaiduAk).toBe(true)
-    expect(summary.hasAmapKey).toBe(false)
-    expect(JSON.stringify(summary)).not.toContain('super-secret-ak')
-    expect(JSON.stringify(summary)).not.toContain('baiduAk')
+    expect(summary.hasAmapKey).toBe(true)
+    expect(JSON.stringify(summary)).not.toContain('super-secret-key')
+    expect(JSON.stringify(summary)).not.toContain('amapKey')
   })
 
   it('throws on an unparsable existing file instead of overwriting it', () => {

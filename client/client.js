@@ -6,7 +6,7 @@
  * the same stance as the modlens client half. Data flows through the host
  * loopback route /dsh-map-tools/config, never through the DSH settings
  * document: keys are stored in ~/.dsh-map-tools/config.json and never echoed
- * back to the card (only hasAmapKey / hasBaiduAk booleans).
+ * back to the card (only hasAmapKey boolean).
  */
 window.__ModuleLoader__.load({
   id: 'dsh-map-tools',
@@ -55,10 +55,8 @@ window.__ModuleLoader__.load({
       var h = react.createElement
       var Input = ui.Input
       var AMAP_URL = 'https://console.amap.com/dev/key/app'
-      var BAIDU_URL = 'https://lbsyun.baidu.com/apiconsole/key'
       var PROVIDERS = [
-        { id: 'amap', label: '高德地图' },
-        { id: 'baidu', label: '百度地图' },
+        { id: 'amap', label: '高德地图（推荐）' },
         { id: 'osm', label: '免费 OSM（无需 key，能力有限）' },
       ]
 
@@ -103,7 +101,6 @@ window.__ModuleLoader__.load({
             draftState[1]({
               provider: data.provider || 'amap',
               amapKey: '',
-              baiduAk: '',
               timeoutMs: data.timeoutMs || 15000,
             })
           }).catch(() => {})
@@ -119,7 +116,6 @@ window.__ModuleLoader__.load({
           var payload = {}
           if (draft.provider !== summary.provider) payload.provider = draft.provider
           if (draft.amapKey !== '') payload.amapKey = draft.amapKey
-          if (draft.baiduAk !== '') payload.baiduAk = draft.baiduAk
           if (draft.timeoutMs && draft.timeoutMs !== summary.timeoutMs) payload.timeoutMs = draft.timeoutMs
           fetch('/dsh-map-tools/config', {
             method: 'POST',
@@ -159,7 +155,7 @@ window.__ModuleLoader__.load({
           },
             h('span', { style: { flex: '1', fontWeight: 600 } }, 'dsh-map-tools'),
             h('span', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } },
-              summary ? (summary.provider ? (summary.provider === 'amap' ? '高德' : summary.provider === 'baidu' ? '百度' : 'OSM') : '未配置') + (summary.hasAmapKey || summary.hasBaiduAk ? ' ✓' : '') : '加载中…'),
+              summary ? (summary.provider ? (summary.provider === 'amap' ? '高德' : 'OSM') : '未配置') + (summary.hasAmapKey ? ' ✓' : '') : '加载中…'),
             Chevron(open),
           ),
           open && h('div', {},
@@ -180,15 +176,6 @@ window.__ModuleLoader__.load({
                 placeholder: summary && summary.hasAmapKey ? '已配置（留空保持不变）' : 'amapKey',
                 value: draft ? draft.amapKey : '',
                 onChange: function (e) { draftState[1]({ ...(draft || {}), amapKey: e.target.value }) },
-              }),
-            ),
-            h('div', { style: fieldStyle },
-              h('span', { style: labelStyle }, '百度 ak（服务端） — ', ApplyLink(BAIDU_URL, '如何获取百度 Key？')),
-              h(Input, {
-                ...maskProps(),
-                placeholder: summary && summary.hasBaiduAk ? '已配置（留空保持不变）' : 'baiduAk',
-                value: draft ? draft.baiduAk : '',
-                onChange: function (e) { draftState[1]({ ...(draft || {}), baiduAk: e.target.value }) },
               }),
             ),
             h('div', { style: fieldStyle },

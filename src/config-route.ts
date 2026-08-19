@@ -107,9 +107,8 @@ export function installConfigRoute(ctx: Context): void {
           }
           const patch = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>
           applyConfig({
-            provider: patch.provider as 'amap' | 'baidu' | 'osm' | undefined,
+            provider: patch.provider as 'amap' | 'osm' | undefined,
             amapKey: patch.amapKey as string | undefined,
-            baiduAk: patch.baiduAk as string | undefined,
             timeoutMs: typeof patch.timeoutMs === 'number' ? patch.timeoutMs : undefined,
           })
           send(200, configSummary())

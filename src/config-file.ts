@@ -20,9 +20,8 @@ export function configPath(): string {
 
 /** What the plugin persists and serves to the settings card. */
 export interface MapToolsFileConfig {
-  provider?: 'amap' | 'baidu' | 'osm'
+  provider?: 'amap' | 'osm'
   amapKey?: string
-  baiduAk?: string
   timeoutMs?: number
 }
 
@@ -54,10 +53,9 @@ export function readConfig(): MapToolsFileConfig {
 /** Persist a patch onto the config file, then return the new whole. */
 export function applyConfig(patch: Partial<MapToolsFileConfig>): MapToolsFileConfig {
   const current = readConfig()
-  for (const key of ['provider', 'amapKey', 'baiduAk', 'timeoutMs'] as const) {
+  for (const key of ['provider', 'amapKey', 'timeoutMs'] as const) {
     if (patch[key] !== undefined) {
       if (key === 'amapKey' && patch.amapKey === '') delete current.amapKey
-      else if (key === 'baiduAk' && patch.baiduAk === '') delete current.baiduAk
       else current[key] = patch[key] as never
     }
   }
@@ -81,13 +79,11 @@ export function configSummary(): {
   provider: MapToolsFileConfig['provider']
   timeoutMs?: number
   hasAmapKey: boolean
-  hasBaiduAk: boolean
 } {
   const c = readConfig()
   return {
     provider: c.provider,
     timeoutMs: c.timeoutMs,
     hasAmapKey: typeof c.amapKey === 'string' && c.amapKey !== '',
-    hasBaiduAk: typeof c.baiduAk === 'string' && c.baiduAk !== '',
   }
 }

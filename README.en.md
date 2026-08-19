@@ -32,27 +32,27 @@ Origin/destination accept either **address text** or **"lng,lat" coordinates** �
 
 ## Configuration (optional)
 
-Configure via the plugin settings page (Settings → Plugins → dsh-map-tools) or `cordis.yml`:
+Configure via the plugin settings card (Settings → Plugins → dsh-map-tools). The card reads/writes `~/.dsh-map-tools/config.json` through a loopback route — no restart needed:
 
-| Field | Default | Description |
-|---|---|---|
-| `provider` | `auto` | `auto`=Amap when key present, else OSM; `amap`=force Amap; `osm`=force OSM/OSRM |
-| `amapKey` | empty | Amap Web Service key (secret-role). [How to get one?](https://console.amap.com/dev/key/app) |
-| `timeoutMs` | `15000` | Per-request timeout (ms) |
-| `defaultMode` | `driving` | Default route mode |
-| `language` | `zh` | Response language |
+```jsonc
+// ~/.dsh-map-tools/config.json
+{
+  "provider": "amap",          // amap | osm
+  "amapKey": "your-amap-web-service-key",
+  "timeoutMs": 15000
+}
+```
 
-`cordis.yml` example:
+**Get an Amap key**: https://console.amap.com/dev/key/app → create an app → request a "Web Service" key (free for individual developers, daily quota).
+
+You can also provide defaults in `cordis.yml` (config-file values win):
 
 ```yaml
 - id: map-tools
   name: dsh-map-tools
   config:
-    provider: auto
-    amapKey: your-amap-web-service-key   # optional; omit for OSM/OSRM free source
+    provider: amap
 ```
-
-> **Get an Amap key**: open https://console.amap.com/dev/key/app → create an app → request a "Web Service" key (free for individual developers, daily quota).
 
 ## Examples
 

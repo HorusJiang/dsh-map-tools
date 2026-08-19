@@ -15,8 +15,8 @@ export interface RouteStep {
 
 /** Normalized route result, provider-agnostic. */
 export interface RouteResult {
-  /** Provider that produced this result: 'amap' | 'baidu' | 'osrm'. */
-  provider: 'amap' | 'baidu' | 'osrm'
+  /** Provider that produced this result: 'amap' | 'osrm'. */
+  provider: 'amap' | 'osrm'
   /** Total distance in meters. */
   distanceM: number
   /** Total duration in seconds. */
@@ -31,8 +31,8 @@ export interface RouteResult {
 
 /** Normalized geocode result. */
 export interface GeocodeResult {
-  /** Provider: 'amap' | 'baidu' | 'nominatim' | 'photon'. */
-  provider: 'amap' | 'baidu' | 'nominatim' | 'photon'
+  /** Provider: 'amap' | 'nominatim' | 'photon'. */
+  provider: 'amap' | 'nominatim' | 'photon'
   /** Matched display name. */
   formatted: string
   /** Normalized [lng, lat]. */
