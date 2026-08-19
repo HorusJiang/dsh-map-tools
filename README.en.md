@@ -76,6 +76,15 @@ pnpm run build                # tsc → lib/
 pnpm test                     # vitest unit tests (mocked network)
 node scripts/smoke.mjs        # smoke: 7 tools register
 node scripts/integration.mjs  # integration: real network requests
+node scripts/amap-e2e.mjs     # Amap e2e (set AMAP_API_KEY)
+```
+
+## Publishing
+
+```sh
+npm config set registry https://registry.npmjs.org/
+npm login
+node scripts/publish.mjs      # one-shot publish (build + pack check + publish + verify)
 ```
 
 ## License

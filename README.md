@@ -79,6 +79,14 @@ node scripts/integration.mjs  # 集成测试：真实网络请求（OSRM/Nominat
 node scripts/amap-e2e.mjs     # 高德 e2e：需设置 AMAP_API_KEY 环境变量
 ```
 
+## 发布
+
+```sh
+npm config set registry https://registry.npmjs.org/
+npm login
+node scripts/publish.mjs      # 一键发布（构建 + 打包检查 + 发布 + 验证）
+```
+
 ## 许可
 
 MIT
