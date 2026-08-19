@@ -18,41 +18,44 @@ dsh plugin --profile web add dsh-map-tools
 
 ## 工具
 
-| 工具 | 功能 | 默认数据源 | 高德数据源 |
-|---|---|---|---|
-| `map_driving_route` | 驾车路线规划 | OSRM | ✅ |
-| `map_transit_route` | 公交/地铁换乘 | —（需高德 key） | ✅ |
-| `map_walking_route` | 步行路线规划 | OSRM | ✅ |
-| `map_bicycling_route` | 骑行路线规划 | OSRM | ✅ |
-| `map_geocode` | 地址 → 经纬度 | Nominatim | ✅ |
-| `map_reverse_geocode` | 经纬度 → 地址 | Nominatim | ✅ |
-| `map_poi_search` | 兴趣点搜索 | —（需高德 key） | ✅ |
+| 工具 | 功能 | OSM 免费源 | 高德 | 百度 |
+|---|---|---|---|---|
+| `map_driving_route` | 驾车路线规划 | ✅ | ✅ | ✅ |
+| `map_transit_route` | 公交/地铁换乘 | — | ✅ | ✅ |
+| `map_walking_route` | 步行路线规划 | ✅ | ✅ | ✅ |
+| `map_bicycling_route` | 骑行路线规划 | ✅ | ✅ | ✅ |
+| `map_geocode` | 地址 → 经纬度 | 中文不可靠 | ✅ | ✅ |
+| `map_reverse_geocode` | 经纬度 → 地址 | 中文不可靠 | ✅ | ✅ |
+| `map_poi_search` | 兴趣点搜索 | — | ✅ | ✅ |
 
 起点/终点统一接受 **地址文本** 或 **"lng,lat" 坐标** 两种形式，插件自动归一化。
 
-## 配置（可选）
+## 配置
 
-配置通过插件设置页（设置 → 插件 → dsh-map-tools）或 `cordis.yml` 完成：
+**推荐方式：设置页配置卡片**（设置 → 插件 → dsh-map-tools）。卡片通过回环路由读写 `~/.dsh-map-tools/config.json`，无需重启即生效：
 
-| 字段 | 默认 | 说明 |
-|---|---|---|
-| `provider` | `auto` | `auto`=有 key 用高德否则用 OSM；`amap`=强制高德；`osm`=强制 OSM/OSRM 免费源 |
-| `amapKey` | 空 | 高德 Web 服务 key（secret 脱敏）。[如何获取？](https://console.amap.com/dev/key/app) |
-| `timeoutMs` | `15000` | 单次请求超时（毫秒） |
-| `defaultMode` | `driving` | 默认路线模式 |
-| `language` | `zh` | 返回语言 |
+```jsonc
+// ~/.dsh-map-tools/config.json
+{
+  "provider": "amap",          // amap | baidu | osm
+  "amapKey": "你的高德Web服务key",  // 二选一
+  "baiduAk": "你的百度服务端ak",     // 或二选一
+  "timeoutMs": 15000
+}
+```
 
-`cordis.yml` 示例：
+**获取 Key**：
+- 高德：[https://console.amap.com/dev/key/app](https://console.amap.com/dev/key/app)（创建应用 → "Web 服务"类型，免费）
+- 百度：[https://lbsyun.baidu.com/apiconsole/key](https://lbsyun.baidu.com/apiconsole/key)（创建应用 → "服务端"类型，免费）
+
+也可以在 `cordis.yml` 中提供默认值（配置文件中的值优先）：
 
 ```yaml
 - id: map-tools
   name: dsh-map-tools
   config:
-    provider: auto
-    amapKey: your-amap-web-service-key   # 可选；不配则用 OSM/OSRM 免费源
+    provider: amap
 ```
-
-> **获取高德 Key**：打开 https://console.amap.com/dev/key/app → 创建应用 → 申请"Web 服务"类型 key（个人开发者免费，有每日配额）。
 
 ## 示例
 
