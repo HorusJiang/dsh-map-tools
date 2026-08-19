@@ -1,0 +1,194 @@
+/** Route planning tools: driving / transit / walking / bicycling. */
+
+import { defineTool } from '@deepseek-ai/dsh-tools'
+import type { Context } from '@deepseek-ai/cordis'
+import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
+import type { AmapClient } from '../clients/amap.js'
+import type { OsrmClient } from '../clients/osrm.js'
+import type { LngLat } from '../types.js'
+import { parseLngLat } from '../types.js'
+
+/** Shared runtime handle handed to every tool (built by the plugin entry). */
+export interface MapClients {
+  amap?: AmapClient
+  osrm?: OsrmClient
+  /** Resolve an address (or `lng,lat`) to coordinates; throws with a helpful message. */
+  resolve: (text: string, signal: AbortSignal) => Promise<LngLat>
+  /** Resolve a city name for transit queries ('' if unknown). */
+  resolveCity: (text: string, signal: AbortSignal) => Promise<string>
+  defaultMode: 'driving' | 'transit' | 'walking' | 'bicycling'
+}
+
+interface RouteArgs {
+  origin: string
+  destination: string
+  /** Optional waypoints, e.g. "116.4,39.9;116.5,39.9" (Amap driving only). */
+  waypoints?: string
+  /** Request alternative routes when the provider supports it. */
+  alternatives?: boolean
+}
+
+function routeTool(
+  name: string,
+  description: string,
+  mode: 'driving' | 'transit' | 'walking' | 'bicycling',
+  clients: MapClients,
+) {
+  const osrmProfile = mode === 'walking' ? 'walking' : mode === 'bicycling' ? 'cycling' : 'driving'
+  return defineTool({
+    name,
+    description,
+    parameters: {
+      origin: { type: 'string', required: true, description: 'Start point: an address, or "lng,lat" coordinates.' },
+      destination: { type: 'string', required: true, description: 'End point: an address, or "lng,lat" coordinates.' },
+      waypoints: { type: 'string', description: 'Optional waypoints as "lng,lat;lng,lat" (Amap driving only).' },
+      alternatives: { type: 'boolean', description: 'Request alternative routes (default false).' },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          provider: { type: 'string' },
+          distanceM: { type: 'number' },
+          durationS: { type: 'number' },
+          polyline: { type: 'string' },
+          steps: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                instruction: { type: 'string' },
+                distanceM: { type: 'number' },
+                durationS: { type: 'number' },
+              },
+            },
+          },
+          alternatives: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                provider: { type: 'string' },
+                distanceM: { type: 'number' },
+                durationS: { type: 'number' },
+                steps: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    additionalProperties: false,
+                    properties: {
+                      instruction: { type: 'string' },
+                      distanceM: { type: 'number' },
+                      durationS: { type: 'number' },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      render: (_args, value) => {
+        const v = value as {
+          provider: string
+          distanceM: number
+          durationS: number
+          polyline?: string
+          steps: Array<{ instruction: string; distanceM: number; durationS: number }>
+          alternatives?: Array<{ provider: string; distanceM: number; durationS: number }>
+        }
+        const mins = (s: number) => Math.round(s / 60)
+        const providerName = v.provider === 'amap' ? '高德' : 'OSRM'
+        const distanceText = v.distanceM >= 1000 ? `${(v.distanceM / 1000).toFixed(1)} 公里` : `${v.distanceM} 米`
+        const lines = [
+          `${providerName} 路线：${distanceText}，约 ${mins(v.durationS)} 分钟`,
+        ]
+        for (const s of v.steps.slice(0, 12)) {
+          lines.push(`- ${s.instruction}`)
+        }
+        if (v.steps.length > 12) lines.push(`- …（共 ${v.steps.length} 步）`)
+        if (v.alternatives?.length) {
+          lines.push(`另有 ${v.alternatives.length} 条备选路线：`)
+          for (const a of v.alternatives) {
+            const aName = a.provider === 'amap' ? '高德' : 'OSRM'
+            lines.push(`  - ${aName}：${(a.distanceM / 1000).toFixed(1)} 公里 / ${mins(a.durationS)} 分钟`)
+          }
+        }
+        return [{ type: 'text', text: lines.join('\n') }]
+      },
+    },
+    async execute(args: RouteArgs, exec: ToolRunContext) {
+      const origin = parseLngLat(args.origin) ?? (await clients.resolve(args.origin, exec.signal))
+      const destination = parseLngLat(args.destination) ?? (await clients.resolve(args.destination, exec.signal))
+
+      // Preferred: Amap (best quality). Fallback: OSRM (no transit support).
+      if (clients.amap) {
+        const city1 = mode === 'transit' ? await clients.resolveCity(args.origin, exec.signal) : undefined
+        const city2 = mode === 'transit' ? await clients.resolveCity(args.destination, exec.signal) : undefined
+        const result = await clients.amap.route(origin, destination, mode, { city1, city2 }, exec.signal)
+        const out: Record<string, unknown> = {
+          provider: result.provider,
+          distanceM: result.distanceM,
+          durationS: result.durationS,
+          polyline: result.polyline,
+          steps: result.steps,
+        }
+        if (args.waypoints && mode === 'driving') {
+          out.waypoints = args.waypoints.split(';').map((w) => w.trim()).filter(Boolean).join(';')
+        }
+        return out
+      }
+
+      // Fallback: OSRM (driving/walking/cycling only; no transit).
+      if (mode === 'transit') {
+        throw new Error('公交路线需要高德 key（OSRM 不支持公交换乘）。请在插件配置中设置 amapKey；如何获取：https://console.amap.com/dev/key/app')
+      }
+      const result = await clients.osrm!.route(origin, destination, osrmProfile, exec.signal)
+      return {
+        provider: result.provider,
+        distanceM: result.distanceM,
+        durationS: result.durationS,
+        polyline: result.polyline,
+        steps: result.steps,
+      }
+    },
+  })
+}
+
+export function registerRouteTools(ctx: Context, clients: MapClients, disposers: Array<() => void> = []): void {
+  disposers.push(ctx.tools.register(
+    routeTool(
+      'map_driving_route',
+      '规划驾车路线，返回距离、预计耗时和分段指引。起点/终点支持地址或 "lng,lat" 坐标。',
+      'driving',
+      clients,
+    ),
+  ))
+  disposers.push(ctx.tools.register(
+    routeTool(
+      'map_transit_route',
+      '规划公交/地铁换乘路线（需配置高德 amapKey），返回距离、耗时和多段换乘指引。',
+      'transit',
+      clients,
+    ),
+  ))
+  disposers.push(ctx.tools.register(
+    routeTool(
+      'map_walking_route',
+      '规划步行路线，返回距离、预计耗时和分段指引。',
+      'walking',
+      clients,
+    ),
+  ))
+  disposers.push(ctx.tools.register(
+    routeTool(
+      'map_bicycling_route',
+      '规划骑行路线，返回距离、预计耗时和分段指引。',
+      'bicycling',
+      clients,
+    ),
+  ))
+}
