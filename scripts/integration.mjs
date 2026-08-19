@@ -38,7 +38,7 @@ const ctx = new Context()
 const tools = new StubToolsRegistry()
 ctx.provide('tools', tools)
 
-const config = plugin.Config({ provider: 'auto', timeoutMs: 20000, defaultMode: 'driving', language: 'zh' })
+const config = plugin.Config({ provider: 'osm', timeoutMs: 20000, defaultMode: 'driving', language: 'zh' })
 plugin.apply(ctx, config)
 
 const byName = Object.fromEntries(tools.registered.map((t) => [t.name, t]))
@@ -59,25 +59,25 @@ if (routeResult.provider !== 'osrm' || !(routeResult.distanceM > 0)) {
 }
 console.log('OK: driving route via OSRM')
 
-// --- Test 2: geocode (Nominatim, zero key) — may fail on CN networks ---
+// --- Test 2: geocode (free sources: Photon → Nominatim) ---
 const geocode = byName['map_geocode']
 try {
   const geoResult = await geocode.execute({ address: 'Beijing Tiananmen' }, makeExec(ac.signal))
   console.log('geocode provider:', geoResult.provider, 'loc:', geoResult.location)
-  if (geoResult.provider !== 'nominatim' || !Array.isArray(geoResult.location)) {
+  if (!['photon', 'nominatim', 'inline'].includes(geoResult.provider) || !Array.isArray(geoResult.location)) {
     console.error('FAIL: geocode result unexpected', JSON.stringify(geoResult))
     process.exit(1)
   }
-  console.log('OK: geocode via Nominatim')
+  console.log('OK: geocode via free source (' + geoResult.provider + ')')
 } catch (err) {
-  // Nominatim unreachable on CN networks is expected; the error must be informative.
+  // Both free sources unreachable on CN networks is expected; the error must be informative.
   const msg = String(err?.message ?? err)
-  console.log('geocode threw (expected on CN networks if Nominatim blocked):', msg)
-  if (!/Nominatim|nominatim/.test(msg)) {
-    console.error('FAIL: geocode error not informative about Nominatim', msg)
+  console.log('geocode threw (expected if free sources blocked):', msg)
+  if (!/Photon|Nominatim|photon|nominatim|高德/.test(msg)) {
+    console.error('FAIL: geocode error not informative about free sources', msg)
     process.exit(1)
   }
-  console.log('OK: geocode failure is informative (Nominatim unreachable)')
+  console.log('OK: geocode failure is informative (free sources unreachable)')
 }
 
 // --- Test 3: transit without key must fail informatively ---
@@ -89,12 +89,16 @@ try {
 } catch (err) {
   const msg = String(err?.message ?? err)
   console.log('transit threw (expected without amapKey):', msg)
-  if (!/amapKey|高德/.test(msg)) {
-    console.error('FAIL: transit error missing amapKey guidance', msg)
+  if (!/amapKey|baiduAk|高德|百度/.test(msg)) {
+    console.error('FAIL: transit error missing provider guidance', msg)
     process.exit(1)
   }
-  console.log('OK: transit requires amapKey with guidance')
+  console.log('OK: transit requires provider key with guidance')
 }
 
 console.log('\nALL INTEGRATION TESTS PASSED')
-process.exit(0)
+// Give pending network handles a chance to settle before hard exit;
+// Windows node can crash (UV_HANDLE_CLOSING) if an aborted fetch is still
+// winding down when process.exit fires.
+ac.abort()
+setTimeout(() => process.exit(0), 100)

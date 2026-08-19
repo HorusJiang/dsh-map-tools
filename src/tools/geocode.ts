@@ -4,12 +4,16 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { AmapClient } from '../clients/amap.js'
+import type { BaiduClient } from '../clients/baidu.js'
 import type { NominatimClient } from '../clients/nominatim.js'
+import type { PhotonClient } from '../clients/photon.js'
 import { parseLngLat } from '../types.js'
 
 export interface GeocodeClients {
   amap?: AmapClient
+  baidu?: BaiduClient
   nominatim?: NominatimClient
+  photon?: PhotonClient
 }
 
 export function registerGeocodeTools(ctx: Context, clients: GeocodeClients, disposers: Array<() => void> = []): void {
@@ -37,7 +41,7 @@ export function registerGeocodeTools(ctx: Context, clients: GeocodeClients, disp
         },
         render: (_args, value) => {
           const v = value as { provider: string; formatted: string; location: number[]; city?: string; district?: string }
-          const name = v.provider === 'amap' ? '高德' : v.provider === 'nominatim' ? 'Nominatim(OSM)' : 'inline'
+          const name = v.provider === 'amap' ? '高德' : v.provider === 'baidu' ? '百度' : v.provider === 'nominatim' ? 'Nominatim(OSM)' : 'inline'
           const area = v.city ? `（${v.city}${v.district ? ` ${v.district}` : ''}）` : ''
           return [{
             type: 'text',
@@ -55,11 +59,30 @@ export function registerGeocodeTools(ctx: Context, clients: GeocodeClients, disp
           const r = await clients.amap.geocode(args.address, exec.signal)
           return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
         }
-        if (clients.nominatim) {
-          const r = await clients.nominatim.geocode(args.address, exec.signal)
+        if (clients.baidu) {
+          const r = await clients.baidu.geocode(args.address, exec.signal)
           return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
         }
-        throw new Error('未配置任何地理编码服务：请设置 amapKey，或检查网络。')
+        // Free sources (Photon/Nominatim) are unreliable for Chinese addresses.
+        // Try them, but convert any failure into an actionable prompt.
+        let lastError: string = '免费地理编码服务不可用'
+        if (clients.photon) {
+          try {
+            const r = await clients.photon.geocode(args.address, exec.signal)
+            return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err)
+          }
+        }
+        if (clients.nominatim) {
+          try {
+            const r = await clients.nominatim.geocode(args.address, exec.signal)
+            return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err)
+          }
+        }
+        throw new Error(`免费数据源无法可靠解析中文地址："${args.address}"（${lastError}）。请直接提供 "lng,lat" 坐标，或在插件配置中设置高德 amapKey（https://console.amap.com/dev/key/app）或百度 baiduAk（https://lbsyun.baidu.com/apiconsole/key）。`)
       },
     }),
   ))
@@ -88,7 +111,7 @@ export function registerGeocodeTools(ctx: Context, clients: GeocodeClients, disp
         },
         render: (_args, value) => {
           const v = value as { provider: string; formatted: string; location: number[]; city?: string; district?: string }
-          const name = v.provider === 'amap' ? '高德' : v.provider === 'nominatim' ? 'Nominatim(OSM)' : '未知'
+          const name = v.provider === 'amap' ? '高德' : v.provider === 'baidu' ? '百度' : v.provider === 'nominatim' ? 'Nominatim(OSM)' : '未知'
           return [{ type: 'text', text: `${name}：${v.formatted}` }]
         },
       },
@@ -99,11 +122,28 @@ export function registerGeocodeTools(ctx: Context, clients: GeocodeClients, disp
           const r = await clients.amap.reverseGeocode(coord, exec.signal)
           return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
         }
-        if (clients.nominatim) {
-          const r = await clients.nominatim.reverseGeocode(coord, exec.signal)
+        if (clients.baidu) {
+          const r = await clients.baidu.reverseGeocode(coord, exec.signal)
           return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
         }
-        throw new Error('未配置任何地理编码服务：请设置 amapKey，或检查网络。')
+        let lastError: string = '免费地理编码服务不可用'
+        if (clients.photon) {
+          try {
+            const r = await clients.photon.reverseGeocode(coord, exec.signal)
+            return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err)
+          }
+        }
+        if (clients.nominatim) {
+          try {
+            const r = await clients.nominatim.reverseGeocode(coord, exec.signal)
+            return { provider: r.provider, formatted: r.formatted, location: r.location, city: r.city, district: r.district }
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err)
+          }
+        }
+        throw new Error(`免费逆地理编码服务不可用（${lastError}）。请配置高德 amapKey（https://console.amap.com/dev/key/app）或百度 baiduAk（https://lbsyun.baidu.com/apiconsole/key）以获得稳定结果。`)
       },
     }),
   ))

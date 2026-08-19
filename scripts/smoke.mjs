@@ -33,7 +33,7 @@ const tools = new StubToolsRegistry()
 ctx.provide('tools', tools)
 
 const config = plugin.Config({
-  provider: 'auto',
+  provider: 'osm',
   timeoutMs: 15000,
   defaultMode: 'driving',
   language: 'zh',

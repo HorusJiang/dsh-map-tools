@@ -11,10 +11,11 @@ import { parseLngLat } from '../types.js'
 /** Shared runtime handle handed to every tool (built by the plugin entry). */
 export interface MapClients {
   amap?: AmapClient
+  baidu?: import('../clients/baidu.js').BaiduClient
   osrm?: OsrmClient
   /** Resolve an address (or `lng,lat`) to coordinates; throws with a helpful message. */
   resolve: (text: string, signal: AbortSignal) => Promise<LngLat>
-  /** Resolve a city name for transit queries ('' if unknown). */
+  /** Resolve the city name for a point (transit queries need city1/city2). */
   resolveCity: (text: string, signal: AbortSignal) => Promise<string>
   defaultMode: 'driving' | 'transit' | 'walking' | 'bicycling'
 }
@@ -124,7 +125,7 @@ function routeTool(
       const origin = parseLngLat(args.origin) ?? (await clients.resolve(args.origin, exec.signal))
       const destination = parseLngLat(args.destination) ?? (await clients.resolve(args.destination, exec.signal))
 
-      // Preferred: Amap (best quality). Fallback: OSRM (no transit support).
+      // Provider priority: Amap → Baidu → OSRM free fallback.
       if (clients.amap) {
         const city1 = mode === 'transit' ? await clients.resolveCity(args.origin, exec.signal) : undefined
         const city2 = mode === 'transit' ? await clients.resolveCity(args.destination, exec.signal) : undefined
@@ -142,9 +143,21 @@ function routeTool(
         return out
       }
 
+      if (clients.baidu) {
+        const city = mode === 'transit' ? await clients.resolveCity(args.origin, exec.signal) : undefined
+        const result = await clients.baidu.route(origin, destination, mode, { city }, exec.signal)
+        return {
+          provider: result.provider,
+          distanceM: result.distanceM,
+          durationS: result.durationS,
+          polyline: result.polyline,
+          steps: result.steps,
+        }
+      }
+
       // Fallback: OSRM (driving/walking/cycling only; no transit).
       if (mode === 'transit') {
-        throw new Error('公交路线需要高德 key（OSRM 不支持公交换乘）。请在插件配置中设置 amapKey；如何获取：https://console.amap.com/dev/key/app')
+        throw new Error('公交路线需要配置高德或百度地图 key。请在插件配置中设置 amapKey 或 baiduAk。')
       }
       const result = await clients.osrm!.route(origin, destination, osrmProfile, exec.signal)
       return {

@@ -11,8 +11,10 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import { AmapClient } from './clients/amap.js'
+import { BaiduClient } from './clients/baidu.js'
 import { OsrmClient } from './clients/osrm.js'
 import { NominatimClient } from './clients/nominatim.js'
+import { PhotonClient } from './clients/photon.js'
 import { registerRouteTools, type MapClients } from './tools/routes.js'
 import { registerGeocodeTools } from './tools/geocode.js'
 import { registerPoiTool } from './tools/poi.js'
@@ -28,15 +30,21 @@ export { Config }
 /** Build (or rebuild) the provider clients from a config. */
 function buildClients(config: ConfigType) {
   const timeoutMs = config.timeoutMs
-  const useAmap = config.provider === 'amap' || (config.provider === 'auto' && !!config.amapKey)
-  const amap = useAmap && config.amapKey ? new AmapClient({ key: config.amapKey, timeoutMs }) : undefined
+  // Provider selection: exactly one primary source per config.provider.
+  const amap = config.provider === 'amap' && config.amapKey
+    ? new AmapClient({ key: config.amapKey, timeoutMs })
+    : undefined
+  const baidu = config.provider === 'baidu' && config.baiduAk
+    ? new BaiduClient({ ak: config.baiduAk, timeoutMs })
+    : undefined
   const osrm = new OsrmClient({ timeoutMs })
   const nominatim = new NominatimClient({
     timeoutMs,
     userAgent: 'dsh-map-tools/0.1.0 (DeepSeek Harness plugin; contact: https://github.com/HorusJiang/dsh-map-tools)',
   })
+  const photon = new PhotonClient({ timeoutMs, lang: config.language })
 
-  /** Resolve an address (or `lng,lat`) to coordinates, preferring Amap. */
+  /** Resolve an address (or `lng,lat`) to coordinates, using the active provider. */
   async function resolve(text: string, signal: AbortSignal): Promise<LngLat> {
     const coord = parseLngLat(text)
     if (coord) return coord
@@ -44,8 +52,14 @@ function buildClients(config: ConfigType) {
       const r = await amap.geocode(text, signal)
       return r.location
     }
-    const r = await nominatim.geocode(text, signal)
-    return r.location
+    if (baidu) {
+      const r = await baidu.geocode(text, signal)
+      return r.location
+    }
+    // Free sources cannot reliably geocode Chinese addresses (Nominatim is
+    // blocked on many CN networks, Photon returns 400 for CJK queries) — give
+    // an actionable prompt instead of a raw provider error.
+    throw new Error(`免费数据源无法可靠解析中文地址："${text}"。请直接提供 "lng,lat" 坐标，或在插件配置中设置高德 amapKey（https://console.amap.com/dev/key/app）或百度 baiduAk（https://lbsyun.baidu.com/apiconsole/key）。`)
   }
 
   /** Resolve the city name for a point (transit queries need city1/city2). */
@@ -55,10 +69,14 @@ function buildClients(config: ConfigType) {
       const r = coord ? await amap.reverseGeocode(coord, signal) : await amap.geocode(text, signal)
       return r.city ?? ''
     }
+    if (baidu) {
+      const r = coord ? await baidu.reverseGeocode(coord, signal) : await baidu.geocode(text, signal)
+      return r.city ?? ''
+    }
     return ''
   }
 
-  return { amap, osrm, nominatim, resolve, resolveCity }
+  return { amap, baidu, osrm, nominatim, photon, resolve, resolveCity }
 }
 
 /** Register every tool under the current clients; returns a disposer. */
@@ -66,14 +84,15 @@ function registerAll(ctx: Context, clients: ReturnType<typeof buildClients>): ()
   const disposers: Array<() => void> = []
   const routeClients: MapClients = {
     amap: clients.amap,
+    baidu: clients.baidu,
     osrm: clients.osrm,
     resolve: clients.resolve,
     resolveCity: clients.resolveCity,
     defaultMode: 'driving',
   }
   registerRouteTools(ctx, routeClients, disposers)
-  registerGeocodeTools(ctx, { amap: clients.amap, nominatim: clients.nominatim }, disposers)
-  registerPoiTool(ctx, { amap: clients.amap, resolve: clients.resolve }, disposers)
+  registerGeocodeTools(ctx, { amap: clients.amap, baidu: clients.baidu, nominatim: clients.nominatim, photon: clients.photon }, disposers)
+  registerPoiTool(ctx, { amap: clients.amap, baidu: clients.baidu, resolve: clients.resolve }, disposers)
   return () => {
     for (const d of disposers) d()
   }
