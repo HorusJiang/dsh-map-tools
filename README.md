@@ -1,14 +1,21 @@
+<p align="center">
+  <img src="assets/banner.svg" width="100%" alt="dsh-map-tools — Map & routing tools for DeepSeek Harness" />
+</p>
+
 # dsh-map-tools
 
-[English](README.en.md) | 中文
+<p align="center">[English](README.en.md) | 中文</p>
 
-地图与路径规划工具插件，为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供驾车/公交/步行/骑行路线规划、地理编码、逆地理编码和 POI 搜索等**原生工具**——模型可直接调用，无需 MCP 服务器。
+<p align="center">地图与路径规划工具插件，为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供驾车/公交/步行/骑行路线规划、地理编码、逆地理编码和 POI 搜索等**原生工具**——模型可直接调用，无需 MCP 服务器。</p>
 
-[![npm version](https://img.shields.io/npm/v/dsh-map-tools)](https://www.npmjs.com/package/dsh-map-tools)
-[![npm downloads](https://img.shields.io/npm/dm/dsh-map-tools)](https://www.npmjs.com/package/dsh-map-tools)
-[![License](https://img.shields.io/npm/l/dsh-map-tools)](LICENSE)
-[![CI](https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/HorusJiang/dsh-map-tools/actions)
-[![dsh-plugin](https://img.shields.io/badge/dsh-plugin-%E5%8F%AF%E5%AE%89%E8%A3%85-blue)](https://github.com/topics/dsh-plugin)
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/v/dsh-map-tools?style=flat-square&label=npm&color=cb3837" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/dm/dsh-map-tools?style=flat-square" alt="downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml"><img src="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-%E5%8F%AF%E5%AE%89%E8%A3%85-2A6BE8?style=flat-square" alt="dsh-plugin"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >= 20">
+</p>
 
 ---
 

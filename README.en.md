@@ -1,14 +1,21 @@
+<p align="center">
+  <img src="assets/banner.svg" width="100%" alt="dsh-map-tools — Map & routing tools for DeepSeek Harness" />
+</p>
+
 # dsh-map-tools
 
-[中文](README.md) | English
+<p align="center">[中文](README.md) | English</p>
 
-Map & routing tools plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search as **native tools** — the model calls them directly, no MCP server required.
+<p align="center">Map & routing tools plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search as **native tools** — the model calls them directly, no MCP server required.</p>
 
-[![npm version](https://img.shields.io/npm/v/dsh-map-tools)](https://www.npmjs.com/package/dsh-map-tools)
-[![npm downloads](https://img.shields.io/npm/dm/dsh-map-tools)](https://www.npmjs.com/package/dsh-map-tools)
-[![License](https://img.shields.io/npm/l/dsh-map-tools)](LICENSE)
-[![CI](https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/HorusJiang/dsh-map-tools/actions)
-[![dsh-plugin](https://img.shields.io/badge/dsh-plugin-installable-blue)](https://github.com/topics/dsh-plugin)
+<p align="center">
+  <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/v/dsh-map-tools?style=flat-square&label=npm&color=cb3837" alt="npm"></a>
+  <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/dm/dsh-map-tools?style=flat-square" alt="downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <a href="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml"><img src="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI"></a>
+  <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-installable-2A6BE8?style=flat-square" alt="dsh-plugin"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >= 20">
+</p>
 
 ---
 
