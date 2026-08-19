@@ -18,6 +18,9 @@ secrets/
 # Dependencies
 node_modules/
 
+# Local pnpm store (project-local v11 store created by pnpm install; keep out of git)
+.pnpm-store/
+
 # Build output
 lib/
 
