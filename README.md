@@ -1,6 +1,6 @@
 # dsh-map-tools
 
-[English](#english) | [中文](#中文)
+[English](README.en.md) | 中文
 
 地图与路径规划工具插件，为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供驾车/公交/步行/骑行路线规划、地理编码、逆地理编码和 POI 搜索等原生工具。
 
