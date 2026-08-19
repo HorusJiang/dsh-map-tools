@@ -72,9 +72,11 @@ dsh plugin --profile web add dsh-map-tools
 
 ```sh
 pnpm install
-pnpm run build          # tsc 构建到 lib/
-node scripts/smoke.mjs  # 冒烟测试：验证 7 工具注册
-node scripts/integration.mjs  # 集成测试：真实网络请求
+pnpm run build                # tsc 构建到 lib/
+pnpm test                     # vitest 单元测试（mock 网络）
+node scripts/smoke.mjs        # 冒烟测试：验证 7 工具注册
+node scripts/integration.mjs  # 集成测试：真实网络请求（OSRM/Nominatim）
+node scripts/amap-e2e.mjs     # 高德 e2e：需设置 AMAP_API_KEY 环境变量
 ```
 
 ## 许可
