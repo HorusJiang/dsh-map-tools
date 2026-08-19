@@ -1,7 +1,20 @@
 # dsh-map-tools 插件开发方案（v1）
 
-> 状态：**方案待确认**。本文档只描述设计与计划，不含实现代码。
+> 状态：**✅ 已实现**（2026-08-19）。本文件是设计文档；实现已落地于 `src/`，配套测试见 `tests/` 与 `scripts/`。
 > 目标：为 DeepSeek Harness 开发一个地图/路径规划工具插件，发布到 npm 并提交收录到 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)。
+
+## 实现状态（对照里程碑）
+
+| 里程碑 | 状态 | 说明 |
+|---|---|---|
+| M1 骨架与构建 | ✅ | package.json / cordis.patch.yml / tsconfig / vitest，`pnpm build` 通过 |
+| M2 客户端层 | ✅ | amap / osrm / nominatim 三个 client，含超时 + 友好降级提示 |
+| M3 路径规划 4 工具 | ✅ | map_driving/transit/walking/bicycling_route |
+| M4 地理编码 + POI | ✅ | map_geocode / map_reverse_geocode / map_poi_search |
+| M5 本机端到端验证 | ✅ | headless 实测模型调用工具（OSRM 路线真实返回；Nominatim 不可达时降级引导生效） |
+| M6 发布 | 🔶 进行中 | GitHub 仓库已建（HorusJiang/dsh-map-tools）；npm 待登录发布；awesome-dsh-plugin 待满 1 天 + 10 commit 后提 PR |
+
+**测试**：26 个 vitest 单元测试（mock 网络）+ smoke + integration + amap-e2e（需 key），全部通过。
 
 ---
 
