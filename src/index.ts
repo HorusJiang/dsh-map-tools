@@ -33,7 +33,7 @@ function buildClients(config: ConfigType) {
   const osrm = new OsrmClient({ timeoutMs })
   const nominatim = new NominatimClient({
     timeoutMs,
-    userAgent: 'dsh-map-tools/0.1.0 (DeepSeek Harness plugin; contact: https://github.com/<your-github-username>/dsh-map-tools)',
+    userAgent: 'dsh-map-tools/0.1.0 (DeepSeek Harness plugin; contact: https://github.com/HorusJiang/dsh-map-tools)',
   })
 
   /** Resolve an address (or `lng,lat`) to coordinates, preferring Amap. */

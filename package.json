@@ -35,9 +35,9 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<your-github-username>/dsh-map-tools.git"
+    "url": "git+https://github.com/HorusJiang/dsh-map-tools.git"
   },
-  "homepage": "https://github.com/<your-github-username>/dsh-map-tools#readme",
+  "homepage": "https://github.com/HorusJiang/dsh-map-tools#readme",
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.5",
