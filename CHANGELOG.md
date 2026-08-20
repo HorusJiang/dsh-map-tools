@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- `applyConfig` 保存时清理已废弃配置字段（`baiduAk`，百度 provider 于
+  0.3.0 移除后残留），避免死字段携带假 key 长驻 `~/.dsh-map-tools/config.json`。
+- AGENTS.md 新增硬性约定：调试/验证脚本一律从 `process.env.AMAP_API_KEY`
+  读取 key，禁止硬编码（对齐 `scripts/amap-e2e.mjs` 范本）。
+
 ## [0.3.2] - 2026-08-20
 
 ### Fixed

@@ -50,6 +50,9 @@ export function readConfig(): MapToolsFileConfig {
   return parsed as MapToolsFileConfig
 }
 
+/** Deprecated config keys, purged on every save (Baidu provider dropped in 0.3.0). */
+const DEPRECATED_KEYS = ['baiduAk'] as const
+
 /** Persist a patch onto the config file, then return the new whole. */
 export function applyConfig(patch: Partial<MapToolsFileConfig>): MapToolsFileConfig {
   const current = readConfig()
@@ -58,6 +61,11 @@ export function applyConfig(patch: Partial<MapToolsFileConfig>): MapToolsFileCon
       if (key === 'amapKey' && patch.amapKey === '') delete current.amapKey
       else current[key] = patch[key] as never
     }
+  }
+  // Purge deprecated fields (e.g. baiduAk from the pre-0.3.0 Baidu provider)
+  // so dead keys don't linger in the config file.
+  for (const key of DEPRECATED_KEYS) {
+    if (key in current) delete (current as Record<string, unknown>)[key]
   }
   mkdirSync(dirname(configPath()), { recursive: true })
   writeFileSync(configPath(), `${JSON.stringify(current, null, 2)}\n`, { mode: 0o600 })

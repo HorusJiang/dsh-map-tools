@@ -64,6 +64,7 @@ node scripts/smoke.mjs   # 7 工具注册检查
 
 - 单元测试用 `vi.stubGlobal('fetch', ...)` mock 网络，**不要**在 tests/ 里发真实请求。
 - 真实请求验证用 `scripts/integration.mjs`（免费源）和 `scripts/amap-e2e.mjs`（需 `AMAP_API_KEY`）。
+- **调试/验证脚本绝不硬编码 key**：需要真实 key 的脚本一律从 `process.env.AMAP_API_KEY` 读取（对齐 `scripts/amap-e2e.mjs` 范本）；临时诊断脚本用完即删，禁止把 key 写进任何脚本文件。
 - 新增/修改 client.js 后：`node --check` 语法 + `node scripts/config-e2e.mjs` 配置回环。
 
 ## 测试政策

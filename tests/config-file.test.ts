@@ -54,4 +54,13 @@ describe('config-file', () => {
     applyConfig({ provider: 'osm' })
     expect(existsSync(configPath())).toBe(true)
   })
+
+  it('purges deprecated fields (baiduAk) on save', () => {
+    writeFileSync(configPath(), JSON.stringify({ provider: 'amap', amapKey: 'test-key', baiduAk: 'old-ak' }), 'utf8')
+    applyConfig({ timeoutMs: 30000 })
+    const saved = readConfig()
+    expect('baiduAk' in saved).toBe(false)
+    expect(saved.amapKey).toBe('test-key')
+    expect(saved.timeoutMs).toBe(30000)
+  })
 })
