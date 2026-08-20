@@ -42,10 +42,11 @@ function buildClients(config: ConfigType) {
   const provider = fileConfig.provider ?? config.provider
   const amapKey = fileConfig.amapKey ?? config.amapKey
   const timeoutMs = fileConfig.timeoutMs ?? config.timeoutMs
+  const maxQps = fileConfig.maxQps ?? config.maxQps
 
   // Provider selection: exactly one primary source per provider.
   const amap = provider === 'amap' && amapKey
-    ? new AmapClient({ key: amapKey, timeoutMs })
+    ? new AmapClient({ key: amapKey, timeoutMs, maxQps })
     : undefined
   const osrm = new OsrmClient({ timeoutMs })
   const nominatim = new NominatimClient({

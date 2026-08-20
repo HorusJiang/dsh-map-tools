@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-08-21
+
+### Added
+
+- **高德配额保护层（`src/clients/amap.ts`）**：个人开发者 key 的 QPS 上限极低
+  （常见 3 QPS/秒，超限报 10021 `CUQPS_HAS_EXCEEDED_THE_LIMIT`），而一次工具
+  调用内部可能连发 1~5 个高德请求、多个工具并行时瞬时击穿配额。新增三层防护：
+  1. **限速排队**：RateLimiter 把任意两次请求的最小间隔钳制在 `1000/maxQps`，
+     并发请求排队等待而非同时发出；
+  2. **TTL 结果缓存**：geocode / route / POI 按参数做内存缓存，同一会话中相同
+     请求直接命中缓存（transit 的 `resolveCity` 会命中 `resolve` 刚写下的
+     geocode 缓存，省掉重复请求）；
+  3. **配额错误分类 + 重试**：10020/10021（QPS 超限）标记为可重试并在客户端内
+     线性退避重试；10022/10023（日配额超限）重试无意义，直接给出友好中文提示
+     （新增 `AmapQuotaError`，`retryable` 字段区分两类）。
+- **路线工具自动降级（`src/tools/routes.ts`）**：高德配额超限时，驾车/步行/骑行
+  自动降级 OSRM 免费源（结果标注 `provider: osrm`）；公交无免费兜底源，改为
+  可操作的错误提示（建议稍后重试或改用其他模式）。地址解析阶段遇到配额超限
+  同样转为"稍后重试或提供 lng,lat 坐标"的引导。
+- **`maxQps` 配置项**：`config.ts` / `config-file.ts` 新增，默认 2（低于高德
+  常见 3 QPS 上限、留余量防 10021）；`configSummary()` 暴露给设置页卡片。
+
+### Fixed
+
+- 高德配额超限时不再裸抛 `Amap API error 10021: CUQPS_HAS_EXCEEDED_THE_LIMIT`，
+  而是自动排队/重试/降级后返回结果，或给出中文可操作提示。
+
 ## [0.3.3] - 2026-08-20
 
 ### Security

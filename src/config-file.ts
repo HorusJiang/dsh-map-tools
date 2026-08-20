@@ -23,6 +23,7 @@ export interface MapToolsFileConfig {
   provider?: 'amap' | 'osm'
   amapKey?: string
   timeoutMs?: number
+  maxQps?: number
 }
 
 /**
@@ -56,7 +57,7 @@ const DEPRECATED_KEYS = ['baiduAk'] as const
 /** Persist a patch onto the config file, then return the new whole. */
 export function applyConfig(patch: Partial<MapToolsFileConfig>): MapToolsFileConfig {
   const current = readConfig()
-  for (const key of ['provider', 'amapKey', 'timeoutMs'] as const) {
+  for (const key of ['provider', 'amapKey', 'timeoutMs', 'maxQps'] as const) {
     if (patch[key] !== undefined) {
       if (key === 'amapKey' && patch.amapKey === '') delete current.amapKey
       else current[key] = patch[key] as never
@@ -86,12 +87,14 @@ export function configFileExists(): boolean {
 export function configSummary(): {
   provider: MapToolsFileConfig['provider']
   timeoutMs?: number
+  maxQps?: number
   hasAmapKey: boolean
 } {
   const c = readConfig()
   return {
     provider: c.provider,
     timeoutMs: c.timeoutMs,
+    maxQps: c.maxQps,
     hasAmapKey: typeof c.amapKey === 'string' && c.amapKey !== '',
   }
 }

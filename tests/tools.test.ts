@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import { registerRouteTools, type MapClients } from '../src/tools/routes.js'
 import { registerGeocodeTools } from '../src/tools/geocode.js'
 import { registerPoiTool } from '../src/tools/poi.js'
+import { AmapQuotaError } from '../src/clients/amap.js'
 import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 
 /** Minimal tools registry stub: captures definitions, returns disposers. */
@@ -86,5 +87,40 @@ describe('tool registration', () => {
     expect(tools.registered.size).toBe(4)
     for (const d of disposers) d()
     expect(tools.registered.size).toBe(0)
+  })
+})
+
+describe('route tool OSRM fallback on Amap quota errors', () => {
+  const execCtx = { signal: new AbortController().signal } as never
+
+  function amapQuotaClients(): { clients: MapClients; tools: ReturnType<typeof makeContext>['tools'] } {
+    const { ctx, tools } = makeContext()
+    const clients: MapClients = {
+      amap: {
+        route: async () => { throw new AmapQuotaError('10021', 'CUQPS_HAS_EXCEEDED_THE_LIMIT', true) },
+      } as never,
+      osrm: {
+        route: async () => ({ provider: 'osrm', distanceM: 5000, durationS: 300, polyline: '', points: [], steps: [{ instruction: 'OSRM step', distanceM: 5000, durationS: 300 }] }),
+      } as never,
+      resolve: noopResolve,
+      resolveCity: async () => '',
+      defaultMode: 'driving',
+    }
+    registerRouteTools(ctx, clients, [])
+    return { clients, tools }
+  }
+
+  it('driving falls back to OSRM when Amap hits a quota error', async () => {
+    const { tools } = amapQuotaClients()
+    const def = tools.registered.get('map_driving_route')!
+    const result = await def.execute({ origin: '0,0', destination: '1,1' }, execCtx)
+    expect((result as { provider: string }).provider).toBe('osrm')
+    expect((result as { steps: Array<{ instruction: string }> }).steps[0].instruction).toBe('OSRM step')
+  })
+
+  it('transit reports a friendly message instead of falling back', async () => {
+    const { tools } = amapQuotaClients()
+    const def = tools.registered.get('map_transit_route')!
+    await expect(def.execute({ origin: '0,0', destination: '1,1' }, execCtx)).rejects.toThrow(/自动降级 OSRM/)
   })
 })

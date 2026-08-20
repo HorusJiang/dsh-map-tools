@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { AmapClient } from '../src/clients/amap.js'
+import { AmapClient, AmapQuotaError } from '../src/clients/amap.js'
 
 const noopSignal = new AbortController().signal
 
@@ -17,7 +17,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-const client = new AmapClient({ key: 'test-key', timeoutMs: 5000 })
+// High maxQps so the shared instance never slows the existing one-request tests.
+const client = new AmapClient({ key: 'test-key', timeoutMs: 5000, maxQps: 1000 })
 
 describe('AmapClient.route (driving)', () => {
   it('parses a driving route response', async () => {
@@ -130,5 +131,87 @@ describe('AmapClient.poiAround', () => {
     expect(String(fetchFn.mock.calls[0][0])).toContain('/v5/place/around')
     expect(String(fetchFn.mock.calls[0][0])).toContain('radius=500')
     expect(results[0].distanceM).toBe(150)
+  })
+})
+
+describe('AmapClient quota protection', () => {
+  const okRoute = (distance: string, duration: string) => ({
+    status: '1',
+    info: 'OK',
+    route: { paths: [{ distance, duration, steps: [{ instruction: '直行', distance: '100', duration: '10' }] }] },
+  })
+
+  it('classifies QPS-exceeded (10021) as a retryable quota error', async () => {
+    mockFetchOnce({ status: '0', info: 'CUQPS_HAS_EXCEEDED_THE_LIMIT', infocode: '10021' })
+    await expect(client.route([0, 0], [1, 1], 'driving', {}, noopSignal)).rejects.toBeInstanceOf(AmapQuotaError)
+    await expect(client.route([0, 0], [1, 1], 'driving', {}, noopSignal)).rejects.toMatchObject({ retryable: true })
+  })
+
+  it('retries a retryable quota error before giving up', async () => {
+    const fn = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ status: '0', info: 'CUQPS_HAS_EXCEEDED_THE_LIMIT', infocode: '10021' }),
+      } as unknown as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => okRoute('12700', '1466'),
+      } as unknown as Response)
+    vi.stubGlobal('fetch', fn)
+
+    const localClient = new AmapClient({ key: 'test-key', timeoutMs: 5000, maxQps: 1000 })
+    const result = await localClient.route([0, 0], [1, 1], 'driving', {}, noopSignal)
+
+    expect(fn).toHaveBeenCalledTimes(2)
+    expect(result.provider).toBe('amap')
+    expect(result.distanceM).toBe(12700)
+  })
+
+  it('classifies daily-quota-exceeded (10022) as non-retryable', async () => {
+    mockFetchOnce({ status: '0', info: 'DAILY_QUERY_OVER_LIMIT', infocode: '10022' })
+    await expect(client.route([0, 0], [1, 1], 'driving', {}, noopSignal)).rejects.toMatchObject({ retryable: false })
+  })
+
+  it('rate-limits concurrent requests to maxQps', async () => {
+    const started: number[] = []
+    const fn = vi.fn().mockImplementation(async () => {
+      started.push(Date.now())
+      return {
+        ok: true,
+        status: 200,
+        json: async () => okRoute('1000', '100'),
+      } as unknown as Response
+    })
+    vi.stubGlobal('fetch', fn)
+
+    // maxQps = 20 → 50ms min interval between request starts.
+    const localClient = new AmapClient({ key: 'test-key', timeoutMs: 5000, maxQps: 20 })
+    await Promise.all([
+      localClient.route([0, 0], [1, 1], 'driving', {}, noopSignal),
+      localClient.route([2, 2], [3, 3], 'driving', {}, noopSignal),
+    ])
+
+    expect(fn).toHaveBeenCalledTimes(2)
+    expect(started).toHaveLength(2)
+    expect(started[1] - started[0]).toBeGreaterThanOrEqual(40)
+  })
+
+  it('serves repeat geocodes from cache without hitting the network again', async () => {
+    const fn = mockFetchOnce({
+      status: '1',
+      info: 'OK',
+      geocodes: [
+        { formatted_address: '北京市朝阳区建国路88号', location: '116.460929,39.909673', city: '北京市', adcode: '110105' },
+      ],
+    })
+
+    const localClient = new AmapClient({ key: 'test-key', timeoutMs: 5000, maxQps: 1000 })
+    const first = await localClient.geocode('建国路88号', noopSignal)
+    const second = await localClient.geocode('建国路88号', noopSignal)
+
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(second).toEqual(first)
   })
 })

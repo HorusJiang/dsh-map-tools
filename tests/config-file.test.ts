@@ -22,11 +22,12 @@ describe('config-file', () => {
   })
 
   it('applies a patch and persists it', () => {
-    applyConfig({ provider: 'amap', amapKey: 'test-key', timeoutMs: 20000 })
+    applyConfig({ provider: 'amap', amapKey: 'test-key', timeoutMs: 20000, maxQps: 4 })
     const saved = readConfig()
     expect(saved.provider).toBe('amap')
     expect(saved.amapKey).toBe('test-key')
     expect(saved.timeoutMs).toBe(20000)
+    expect(saved.maxQps).toBe(4)
   })
 
   it('clears a key when patched with an empty string', () => {

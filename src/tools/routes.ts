@@ -3,7 +3,7 @@
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import type { AmapClient } from '../clients/amap.js'
+import { AmapQuotaError, type AmapClient } from '../clients/amap.js'
 import type { OsrmClient } from '../clients/osrm.js'
 import type { LngLat } from '../types.js'
 import { parseLngLat } from '../types.js'
@@ -123,25 +123,64 @@ function routeTool(
       },
     },
     async execute(args: RouteArgs, exec: ToolRunContext) {
-      const origin = parseLngLat(args.origin) ?? (await clients.resolve(args.origin, exec.signal))
-      const destination = parseLngLat(args.destination) ?? (await clients.resolve(args.destination, exec.signal))
+      let origin: LngLat
+      let destination: LngLat
+      try {
+        origin = parseLngLat(args.origin) ?? (await clients.resolve(args.origin, exec.signal))
+        destination = parseLngLat(args.destination) ?? (await clients.resolve(args.destination, exec.signal))
+      } catch (err) {
+        // 地址解析阶段的高德配额超限：没有坐标就无法降级，转成可操作提示。
+        if (err instanceof AmapQuotaError) {
+          throw new Error(`地址解析暂时不可用（${err.message}）。请稍后重试，或直接提供 "lng,lat" 坐标。`)
+        }
+        throw err
+      }
 
       // Provider priority: Amap → OSRM free fallback.
       if (clients.amap) {
-        const city1 = mode === 'transit' ? await clients.resolveCity(args.origin, exec.signal) : undefined
-        const city2 = mode === 'transit' ? await clients.resolveCity(args.destination, exec.signal) : undefined
-        const result = await clients.amap.route(origin, destination, mode, { city1, city2 }, exec.signal)
-        const out: Record<string, unknown> = {
-          provider: result.provider,
-          distanceM: result.distanceM,
-          durationS: result.durationS,
-          polyline: result.polyline,
-          steps: result.steps,
+        try {
+          let city1: string | undefined
+          let city2: string | undefined
+          try {
+            city1 = mode === 'transit' ? await clients.resolveCity(args.origin, exec.signal) : undefined
+            city2 = mode === 'transit' ? await clients.resolveCity(args.destination, exec.signal) : undefined
+          } catch (err) {
+            // 城市解析也受高德配额影响；公交没有 city 无法请求，但非公交不受影响。
+            if (err instanceof AmapQuotaError && mode === 'transit') {
+              throw new Error(`公交路线需要城市解析，但高德暂不可用（${err.message}）。请稍后重试，或改用驾车/步行/骑行路线（自动降级 OSRM 免费源）。`)
+            }
+            throw err
+          }
+          const result = await clients.amap.route(origin, destination, mode, { city1, city2 }, exec.signal)
+          const out: Record<string, unknown> = {
+            provider: result.provider,
+            distanceM: result.distanceM,
+            durationS: result.durationS,
+            polyline: result.polyline,
+            steps: result.steps,
+          }
+          if (args.waypoints && mode === 'driving') {
+            out.waypoints = args.waypoints.split(';').map((w) => w.trim()).filter(Boolean).join(';')
+          }
+          return out
+        } catch (err) {
+          // 高德配额超限（QPS/日配额）：非公交模式自动降级 OSRM 兜底，
+          // 公交无免费兜底源，给用户可操作的提示。
+          if (err instanceof AmapQuotaError) {
+            if (mode === 'transit') {
+              throw new Error(`高德公交路线暂不可用（${err.message}）。请稍后重试，或改用驾车/步行/骑行路线（自动降级 OSRM 免费源）。`)
+            }
+            const result = await clients.osrm!.route(origin, destination, osrmProfile, exec.signal)
+            return {
+              provider: result.provider,
+              distanceM: result.distanceM,
+              durationS: result.durationS,
+              polyline: result.polyline,
+              steps: result.steps,
+            }
+          }
+          throw err
         }
-        if (args.waypoints && mode === 'driving') {
-          out.waypoints = args.waypoints.split(';').map((w) => w.trim()).filter(Boolean).join(';')
-        }
-        return out
       }
 
       // Fallback: OSRM (driving/walking/cycling only; no transit).
