@@ -5,6 +5,18 @@ import { formatLngLat } from '../types.js'
 
 const REST = 'https://restapi.amap.com/'
 
+/**
+ * Normalize Amap's `city` field to a plain string.
+ *
+ * 高德对直辖市（北京/上海/天津/重庆）的 addressComponent.city 返回空数组 []，
+ * 城市名实际在 province 字段里。数组取首元素，空值回退 province。
+ */
+function normalizeCity(city: unknown, province?: unknown): string {
+  const value = Array.isArray(city) ? city[0] : city
+  if (typeof value === 'string' && value) return value
+  return typeof province === 'string' && province ? province : ''
+}
+
 /** Shared fetch helper: GET with key + params, JSON response, abortable, timeout-bounded. */
 async function get<T>(
   path: string,
@@ -129,6 +141,12 @@ export class AmapClient {
     opts: { city1?: string; city2?: string },
     signal: AbortSignal,
   ): Promise<RouteResult> {
+    // Amap transit requires city1 (and ideally city2). If resolution failed,
+    // surface a readable error instead of a bare INVALID_PARAMS.
+    if (!opts.city1 || !opts.city2) {
+      const missing = !opts.city1 ? 'city1(起点城市)' : 'city2(终点城市)'
+      throw new Error(`公交路径规划需要 ${missing}，但城市解析失败。请改用更具体的地址，或直接提供 "lng,lat" 坐标。`)
+    }
     const body = await get<TransitV5Response>(
       'v5/direction/transit/integrated',
       this.opts.key,
@@ -175,7 +193,7 @@ export class AmapClient {
 
   /** Forward geocode: address → coordinates. */
   async geocode(address: string, signal: AbortSignal): Promise<GeocodeResult> {
-    const body = await get<{ geocodes: Array<{ formatted_address: string; location: string; city?: string; district?: string; adcode?: string }> }>(
+    const body = await get<{ geocodes: Array<{ formatted_address: string; location: string; city?: string | string[]; province?: string; district?: string; adcode?: string }> }>(
       'v3/geocode/geo',
       this.opts.key,
       { address },
@@ -190,7 +208,7 @@ export class AmapClient {
       provider: 'amap',
       formatted: first.formatted_address ?? address,
       location: [lng, lat],
-      city: first.city,
+      city: normalizeCity(first.city, first.province),
       district: first.district,
       adcode: first.adcode,
     }
@@ -198,7 +216,7 @@ export class AmapClient {
 
   /** Reverse geocode: coordinates → address. */
   async reverseGeocode(location: LngLat, signal: AbortSignal): Promise<GeocodeResult> {
-    const body = await get<{ regeocode: { formatted_address: string; addressComponent?: { city?: string; district?: string; adcode?: string } } }>(
+    const body = await get<{ regeocode: { formatted_address: string; addressComponent?: { city?: string | string[]; province?: string; district?: string; adcode?: string } } }>(
       'v3/geocode/regeo',
       this.opts.key,
       { location: formatLngLat(location) },
@@ -207,13 +225,14 @@ export class AmapClient {
     )
     const re = body.regeocode
     if (!re) throw new Error('Amap reverse geocode returned no result')
+    const comp = re.addressComponent
     return {
       provider: 'amap',
       formatted: re.formatted_address ?? formatLngLat(location),
       location,
-      city: re.addressComponent?.city,
-      district: re.addressComponent?.district,
-      adcode: re.addressComponent?.adcode,
+      city: normalizeCity(comp?.city, comp?.province),
+      district: comp?.district,
+      adcode: comp?.adcode,
     }
   }
 

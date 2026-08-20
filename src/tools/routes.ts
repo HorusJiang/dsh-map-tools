@@ -103,8 +103,10 @@ function routeTool(
         const mins = (s: number) => Math.round(s / 60)
         const providerName = v.provider === 'amap' ? '高德' : 'OSRM'
         const distanceText = v.distanceM >= 1000 ? `${(v.distanceM / 1000).toFixed(1)} 公里` : `${v.distanceM} 米`
+        // Amap v5 transit returns no duration field — report it as unknown.
+        const durationText = v.durationS > 0 ? `，约 ${mins(v.durationS)} 分钟` : ''
         const lines = [
-          `${providerName} 路线：${distanceText}，约 ${mins(v.durationS)} 分钟`,
+          `${providerName} 路线：${distanceText}${durationText}`,
         ]
         for (const s of v.steps.slice(0, 12)) {
           lines.push(`- ${s.instruction}`)

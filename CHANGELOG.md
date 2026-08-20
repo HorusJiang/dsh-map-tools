@@ -2,7 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.3.2] - 2026-08-20
+
+### Fixed
+
+- **公交换乘（`map_transit_route`）对所有城市报 `Amap API error 20000:
+  INVALID_PARAMS`**。两个叠加根因：
+  1. 高德对直辖市（北京/上海/天津/重庆）的 `addressComponent.city` 返回空
+     数组 `[]`（城市名实际在 `province` 里），导致城市解析拿到 `[]`、
+     city1/city2 参数为空。新增 `normalizeCity()`：数组取首元素、空值回退
+     `province`，`geocode()`/`reverseGeocode()` 统一规范化（类型放宽为
+     `string | string[]`）。
+  2. 高德 v5 公交接口只接受 adcode/citycode，不接受城市名（实测
+     `北京`/`北京市` → INVALID_PARAMS，`110000`/`110101`/`010` → OK）。
+     `resolveCity()` 改为优先返回 geocode/reverseGeocode 结果的 `adcode`
+     （区级 adcode 如 `110101` 亦被接受），缺失时才回退去「市」字的城市名。
+- **`map_reverse_geocode` 在直辖市报 schema 校验失败
+  `"value.city" must be a string`**：同上，`city` 经 `normalizeCity()` 后
+  保证为 `string`。
+- `routeTool` 渲染：高德 v5 公交响应不返回 duration 字段，`durationS` 为 0
+  时不再渲染「约 0 分钟」，只显示距离。
 
 ### Security
 

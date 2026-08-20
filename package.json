@@ -1,7 +1,7 @@
 {
   "name": "dsh-map-tools",
   "description": "Map & routing tools for DeepSeek Harness: driving/transit/walking/bicycling route planning, geocoding, reverse geocoding and POI search via Amap (高德) or free OSM/OSRM.",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

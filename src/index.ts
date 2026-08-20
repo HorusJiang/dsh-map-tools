@@ -68,12 +68,18 @@ function buildClients(config: ConfigType) {
     throw new Error(`免费数据源无法可靠解析中文地址："${text}"。请直接提供 "lng,lat" 坐标，或在插件配置中设置高德 amapKey（https://console.amap.com/dev/key/app）。`)
   }
 
-  /** Resolve the city name for a point (transit queries need city1/city2). */
+  /** Resolve the city code for a point (transit queries need city1/city2).
+   *  Amap v5 transit accepts only an adcode (e.g. "110000" / "110101") or a
+   *  citycode (e.g. "010") — bare city names like "北京" are rejected with
+   *  INVALID_PARAMS. Prefer the adcode from geocoding; fall back to the city
+   *  name as a last resort. */
   async function resolveCity(text: string, signal: AbortSignal): Promise<string> {
     const coord = parseLngLat(text)
     if (amap) {
       const r = coord ? await amap.reverseGeocode(coord, signal) : await amap.geocode(text, signal)
-      return r.city ?? ''
+      if (r.adcode) return r.adcode
+      const city = r.city ?? ''
+      return city.replace(/市$/, '')
     }
     return ''
   }
