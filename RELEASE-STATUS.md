@@ -1,4 +1,4 @@
-# dsh-map-tools 发布状态交接（2026-08-19）
+# dsh-map-tools 发布状态交接（2026-08-21 更新至 v0.4.0）
 
 > 本文档记录插件发布流程的**全部当前状态**，供随时接续，无需重跑调研。
 
@@ -13,19 +13,20 @@
 | GitHub CI | ✅ | .github/workflows/ci.yml（build + test）全绿 |
 | GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（28 commit，dsh-plugin topic，prepare 脚本，本地与 origin/master 同步） |
 | git 安装链路 | ✅ | `dsh plugin add github:HorusJiang/dsh-map-tools` 端到端可用（allowBuilds 引导正常） |
-| **npm 发布** | ✅ | **dsh-map-tools@0.3.1 已上线**（CHANGELOG 0.3.1 = 2026-08-19，`dsh plugin add dsh-map-tools` 安装验证通过） |
-| **Git tags / Release** | ✅ | 4 个 annotated tag（v0.1.0/v0.2.0/v0.3.0/v0.3.1）已推送，指向各自发布 commit；**GitHub Release v0.3.1（Latest）已创建**（2026-08-19，notes 基于 CHANGELOG） |
+| **npm 发布** | ✅ | **dsh-map-tools@0.4.0 已上线**（CHANGELOG 0.4.0 = 2026-08-21，`dsh plugin add dsh-map-tools` 安装即最新） |
+| **Git tags / Release** | ✅ | annotated tag v0.1.0~v0.4.0 均已推送；**GitHub Release v0.4.0（Latest）已创建**（2026-08-21，notes 基于 CHANGELOG） |
 | 收录 PR | ✅ | awesome-dsh-plugin#1842 已提交，**Submission gate 通过**（2026-08-20 11:1x 重跑后 success："repo old enough, enough commits"），mergeable CLEAN |
+| **收录合并** | ✅ | **PR #1842 已由维护者合并（2026-08-20T05:01:27Z，state=MERGED）**，条目已出现在 awesome-dsh-plugin 精选列表；plugins.json 每日刷新后 dshmarket 自动收录 |
 | 一键发布脚本 | ✅ | scripts/publish.mjs（认证守卫 + registry 切换 + 构建 + 发布 + 验证） |
 
-## 待办：维护者审阅合并 PR #1842（阻塞于对方仓库）
+## 待办：~~维护者审阅合并 PR #1842~~ ✅ 已完成
 
-**现状**：收录 gate 已全部通过（首次 run 在 PR 提交时判定仓库仅 0.5 天而 fail；
+~~**现状**：收录 gate 已全部通过（首次 run 在 PR 提交时判定仓库仅 0.5 天而 fail；
 2026-08-20 11:1x 向 PR 分支 `add-dsh-map-tools` push 空 commit 重新触发 CI，
-新 run 的 Submission gate = success，PR mergeable = CLEAN）。
+新 run 的 Submission gate = success，PR mergeable = CLEAN）。~~
 
-- **下一步**：等待 awesome-dsh-plugin 维护者审阅并合并 PR #1842（我方无合并权限，勿尝试 gh pr merge）
-- **合并后**：awesome-dsh-plugin.com/plugins.json 每日刷新 → dshmarket 自动收录（无需额外操作）
+- **已合并**：2026-08-20 由维护者合并 PR #1842；条目已收录进 awesome-dsh-plugin
+  精选列表，dshmarket 通过每日刷新的 plugins.json 自动收录（无需额外操作）。
 
 ## 接续方法
 
