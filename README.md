@@ -12,8 +12,12 @@
   <a href="https://www.npmjs.com/package/dsh-map-tools"><img src="https://img.shields.io/npm/v/dsh-map-tools?style=flat-square&label=npm&color=cb3837" alt="npm"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
   <a href="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml"><img src="https://github.com/HorusJiang/dsh-map-tools/actions/workflows/ci.yml/badge.svg?style=flat-square" alt="CI"></a>
+  <a href="https://github.com/HorusJiang/dsh-map-tools/releases"><img src="https://img.shields.io/github/v/release/HorusJiang/dsh-map-tools?style=flat-square&label=release" alt="Release"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-%E5%8F%AF%E5%AE%89%E8%A3%85-2A6BE8?style=flat-square" alt="dsh-plugin"></a>
+  <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin"><img src="https://img.shields.io/badge/dshmarket-%E6%94%B6%E5%BD%95-22C55E?style=flat-square&logo=shopify&logoColor=white" alt="dshmarket"></a>
+  <img src="https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >= 20">
+  <a href="https://bundlephobia.com/package/dsh-map-tools"><img src="https://img.shields.io/bundlephobia/minzip/dsh-map-tools?style=flat-square" alt="bundle size"></a>
 </p>
 
 ---
