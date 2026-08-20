@@ -15,16 +15,16 @@
 | git 安装链路 | ✅ | `dsh plugin add github:HorusJiang/dsh-map-tools` 端到端可用（allowBuilds 引导正常） |
 | **npm 发布** | ✅ | **dsh-map-tools@0.3.1 已上线**（CHANGELOG 0.3.1 = 2026-08-19，`dsh plugin add dsh-map-tools` 安装验证通过） |
 | **Git tags / Release** | ✅ | 4 个 annotated tag（v0.1.0/v0.2.0/v0.3.0/v0.3.1）已推送，指向各自发布 commit；**GitHub Release v0.3.1（Latest）已创建**（2026-08-19，notes 基于 CHANGELOG） |
-| 收录 PR | ✅ | awesome-dsh-plugin#1842 已提交，mergeable CLEAN，主 check 通过 |
+| 收录 PR | ✅ | awesome-dsh-plugin#1842 已提交，**Submission gate 通过**（2026-08-20 11:1x 重跑后 success："repo old enough, enough commits"），mergeable CLEAN |
 | 一键发布脚本 | ✅ | scripts/publish.mjs（认证守卫 + registry 切换 + 构建 + 发布 + 验证） |
 
-## 待办：收录 gate 最终通过（阻塞于时间）
+## 待办：维护者审阅合并 PR #1842（阻塞于对方仓库）
 
-**阻塞原因**：仓库须满 1 天（首次 commit 2026-08-19 10:48），gate 的 `MIN_AGE_DAYS = 1` 是硬性 CI 检查。
+**现状**：收录 gate 已全部通过（首次 run 在 PR 提交时判定仓库仅 0.5 天而 fail；
+2026-08-20 11:1x 向 PR 分支 `add-dsh-map-tools` push 空 commit 重新触发 CI，
+新 run 的 Submission gate = success，PR mergeable = CLEAN）。
 
-- **预计通过时间**：2026-08-20 10:48 之后
-- **当前状态**：PR #1842 的 submission gate = neutral（"could not be fully checked"），本地模拟验证唯一未达标项就是仓库年龄
-- **满 1 天后**：regate 机制或手动 re-run workflow 会自动重新判定 → 应通过 → 维护者审阅合并
+- **下一步**：等待 awesome-dsh-plugin 维护者审阅并合并 PR #1842（我方无合并权限，勿尝试 gh pr merge）
 - **合并后**：awesome-dsh-plugin.com/plugins.json 每日刷新 → dshmarket 自动收录（无需额外操作）
 
 ## 接续方法
