@@ -107,8 +107,10 @@ window.__ModuleLoader__.load({
         }, [])
 
         react.useEffect(() => {
-          if (open && !summary) load()
-        }, [open, summary, load])
+          // Load the summary on mount (not only on expand) so the collapsed
+          // header shows the provider status immediately instead of "加载中…".
+          if (summary === null) load()
+        }, [summary, load])
 
         var save = function () {
           if (!draft) return
@@ -156,14 +158,17 @@ window.__ModuleLoader__.load({
             style: { ...rowStyle, width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textAlign: 'left' },
             onClick: function () { openState[1](!open) },
           },
-            h('span', { style: { flex: '1', fontSize: '14px', fontWeight: 600 } }, 'dsh-map-tools'),
-            h('span', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } },
-              summary ? (summary.provider ? (summary.provider === 'amap' ? '高德' : 'OSM') : '未配置') + (summary.hasAmapKey ? ' ✓' : '') : '加载中…'),
+            h('div', { style: { flex: '1', minWidth: '0' } },
+              h('div', { style: { fontSize: '14px', fontWeight: 600 } }, '地图引擎 (dsh-map-tools)'),
+              h('div', { style: { fontSize: '13px', lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } }, '地图定位与路径规划：驾车/公交/步行/骑行路线、地理编码、POI 搜索'),
+            ),
+            h('span', { style: { flex: 'none', fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } },
+              summary ? (summary.provider ? (summary.provider === 'amap' ? '高德' : 'OSM') : '未配置') + (summary.hasAmapKey ? ' ✓' : '') : ''),
             Chevron(open),
           ),
           open && h('div', {},
             h('div', { style: { padding: '0 14px 10px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))' } },
-              '地图与路径规划：路线规划、地理编码、POI 搜索。配置数据存于 ~/.dsh-map-tools/config.json。'),
+              '地图定位与路径规划：驾车/公交/步行/骑行路线、地理编码、POI 搜索。配置数据存于 ~/.dsh-map-tools/config.json。'),
             h('div', { style: fieldStyle },
               h('span', { style: labelStyle }, '数据源'),
               h('select', {
