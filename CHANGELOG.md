@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.2] - 2026-08-24
+
+### Fixed
+
+- **仍被 pnpm 构建脚本拦截**：0.4.1 移除了 `postinstall`，但发布包仍带
+  `prepare: npm run build`。pnpm 会把 `prepare` 也当作构建脚本默认拦截
+  （`preinstall`/`install`/`postinstall`/`prepare`），且对 registry 装的包一旦
+  放行就会执行 `npm run build`（`tsc`），而发布包并未携带
+  `src`/`tsconfig.json`/`typescript`，因此安装仍失败。
+- 现将 `prepare` 也从 `scripts` 移除，发布包只保留 `build`/`test`/`hooks`/
+  `check:secrets` 等对消费者无副作用的脚本；`prepack`（仅 `npm pack`/`publish`
+  时运行、不参与依赖安装、不被 pnpm 拦截）保留用于 publish 前构建 `lib/`。
+  这样消费者安装 dsh-map-tools 时，pnpm 不再有任何构建脚本需要拦截或执行。
+
 ## [0.4.1] - 2026-08-24
 
 ### Fixed
