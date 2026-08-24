@@ -57,6 +57,7 @@ scripts/            # smoke / integration / amap-e2e / config-e2e / publish
 
 ```sh
 pnpm install
+pnpm hooks         # 安装 pre-commit secret guard（开发者手动；见"不要做的事"）
 pnpm run build     # tsc → lib/（必须通过）
 pnpm test          # vitest 单元测试（必须全绿）
 node scripts/smoke.mjs   # 7 工具注册检查
@@ -91,4 +92,4 @@ node scripts/smoke.mjs   # 7 工具注册检查
 - 不把 key 写入代码、README 示例或任何可提交文件。
 - 不改动 `cordis.patch.yml` 的插件 id（`map-tools`）——影响已安装用户。
 - 不引入百度/其他需要额外白名单配置的数据源。
-- 不在仓库内创建 `config.json` / `.env` / 密钥文件；pre-commit 钩子会拦截含 key 的提交（`scripts/check-secrets.mjs`）。修改钩子后必须验证：假 key 提交被拒、正常提交放行。
+- 不在仓库内创建 `config.json` / `.env` / 密钥文件；pre-commit 钩子会拦截含 key 的提交（`scripts/check-secrets.mjs`，开发者用 `pnpm hooks` 安装）。修改钩子后必须验证：假 key 提交被拒、正常提交放行。

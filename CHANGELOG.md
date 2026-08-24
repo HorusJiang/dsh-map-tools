@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.1] - 2026-08-24
+
+### Fixed
+
+- **发布包无法被消费者安装**：`scripts.postinstall` 原先运行
+  `node scripts/install-hooks.mjs`（给开发者装 git pre-commit 钩子），但
+  `scripts/` 目录并不在 `package.json` 的 `files` 清单里（仅
+  `lib` / `client` / `cordis.patch.yml` / `LICENSE`），导致发布到 npm 的包
+  **缺失该脚本文件**，消费者安装时 `postinstall` 直接失败
+  （`Cannot find module scripts/install-hooks.mjs`）；`postinstall` 的存在
+  同时也触发了 **pnpm ≥10 默认拦截依赖构建脚本** 的提示（需额外点一次
+  "Allow build scripts"）。
+- 现将 `postinstall` 从 `scripts` 移除——这类只服务开发者本仓库的钩子安装
+  不应在消费者安装时运行，一并消除了"构建脚本拦截"和"缺失文件"的双重失败。
+  开发者如需重新安装 pre-commit secret guard，手动执行 `pnpm hooks`
+  （= `node scripts/install-hooks.mjs`）。
+
 ## [0.4.0] - 2026-08-21
 
 ### Added
