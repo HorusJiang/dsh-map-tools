@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.3] - 2026-08-24
+
+### Fixed
+
+- **设置卡片配色与 DSH 其它插件不一致**：`client/client.js` 的设置卡片原先外层用
+  `<li>`，背景取 `var(--dsw-alias-bg-layer, #1e1e1e)`（实心深色），边框取
+  `--dsw-alias-border`，因此在 设置 → 插件 里渲染成一条扁平的深色实心条，和
+  ModLens 等用半透明主题叠加色（`--dsw-alias-bg-layer-2/-3`）+ `--dsw-alias-border-l2`
+  的圆角卡片不一致。现将卡片外层改为 `div`，背景/边框对齐标准设置的半透明
+  叠加色并添加过渡，使其与 DSH 主题配色一致。
+
 ## [0.4.2] - 2026-08-24
 
 ### Fixed

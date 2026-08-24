@@ -138,22 +138,25 @@ window.__ModuleLoader__.load({
         }
 
         var cardStyle = {
-          border: '1px solid var(--dsw-alias-border, rgba(127,127,127,0.25))',
-          borderRadius: '12px', background: 'var(--dsw-alias-bg-layer, #1e1e1e)',
+          border: '1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35))',
+          borderRadius: '12px',
           marginBottom: '8px', overflow: 'hidden',
+          transition: 'border-color .16s, background .16s',
         }
-        var rowStyle = { padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px' }
+        var rowStyle = { padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }
         var fieldStyle = { display: 'flex', flexDirection: 'column', gap: '6px', padding: '4px 14px 10px' }
         var labelStyle = { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))' }
 
-        return h('li', { style: cardStyle },
+        return h('div', { style: Object.assign({}, cardStyle, {
+          background: open ? 'var(--dsw-alias-bg-layer-2, rgba(127,127,127,0.10))' : 'var(--dsw-alias-bg-layer-3, rgba(127,127,127,0.05))',
+        }) },
           h('button', {
             type: 'button',
             'aria-expanded': open,
             style: { ...rowStyle, width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textAlign: 'left' },
             onClick: function () { openState[1](!open) },
           },
-            h('span', { style: { flex: '1', fontWeight: 600 } }, 'dsh-map-tools'),
+            h('span', { style: { flex: '1', fontSize: '14px', fontWeight: 600 } }, 'dsh-map-tools'),
             h('span', { style: { fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } },
               summary ? (summary.provider ? (summary.provider === 'amap' ? '高德' : 'OSM') : '未配置') + (summary.hasAmapKey ? ' ✓' : '') : '加载中…'),
             Chevron(open),
