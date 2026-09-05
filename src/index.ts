@@ -122,7 +122,7 @@ export function apply(ctx: Context, config: ConfigType): void {
 
   // The settings card route + namespace (modlens pattern): the card reads and
   // writes ~/.dsh-map-tools/config.json through the loopback route, and the
-  // tools rebuild on a change.
-  installConfigRoute(ctx)
+  // tools rebuild on a save (route POST → reload).
+  installConfigRoute(ctx, reload)
   installSettingsNamespace(ctx, config, reload)
 }

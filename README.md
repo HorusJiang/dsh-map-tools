@@ -47,6 +47,10 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 
 > pnpm ≥10 会要求你显式允许该包的构建脚本（`prepare`），按提示把包 key 加入该 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 后重试即可。
 
+> **版本要求**：自 0.5.0 起，本插件兼容 **DeepSeek Harness 0.1.2-rc.1 及以上**
+> （含源码构建的 0.1.3-alpha.1）。更早的 Harness 发布线因
+> `@deepseek-ai/dsh-settings` 移除旧 API 而不再支持。
+
 安装后**重启 `dsh web`**（或等待 HMR 热加载），在会话中即可使用 `map_*` 工具。
 
 > **开发模式**：在本地 clone 后使用 `dsh plugin add <本地路径>` 会以 `link:` 方式安装——改动源码即生效，适合插件迭代。

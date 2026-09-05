@@ -52,8 +52,15 @@ function openConfigFile(): void {
   child.unref()
 }
 
-/** Register the settings-card route under the web server, when one exists. */
-export function installConfigRoute(ctx: Context): void {
+/**
+ * Register the settings-card route under the web server, when one exists.
+ *
+ * @param ctx - plugin context.
+ * @param reload - rebuild the tools after the card saves (the file write alone
+ *   never reaches the registered tool instances; without this the new provider
+ *   or key only takes effect on the next plugin reload).
+ */
+export function installConfigRoute(ctx: Context, reload: () => void = () => {}): void {
   const fn = ctx.inject as unknown as (
     deps: string[],
     callback: (scope: { webServer: { register: (route: {
@@ -112,6 +119,9 @@ export function installConfigRoute(ctx: Context): void {
             timeoutMs: typeof patch.timeoutMs === 'number' ? patch.timeoutMs : undefined,
           })
           send(200, configSummary())
+          // Rebuild the tool instances so the saved provider/key/timeout is
+          // live immediately (the card tells the user "工具已重建").
+          reload()
         } catch (error) {
           send(400, { error: String((error as Error)?.message ?? error) })
         }

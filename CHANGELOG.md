@@ -2,6 +2,33 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.0] - 2026-09-05
+
+### Changed
+
+- **settings 接线迁移到 DSH 0.1.2-rc.1 / 0.1.3-alpha.1 新 API**：`@deepseek-ai/dsh-settings`
+  删除了 `installSettingsSection` 与 `settingsNamespace` 工厂（namespace 改为普通小写连字符
+  字符串，注册/接线改为 `SettingsProvider` 实例方法）。`src/settings-ns.ts` 现经
+  `ctx.inject(['settings'])` 取得 provider 并调用
+  `settings.installSection(ctx, 'dsh-map-tools', ConfigSchema, entry, { setSource, onChange })`
+  ——语义与旧接口等价（组合入口值作 base 层；attach/commit/detach 时回调 reload）；未组合
+  settings 服务的部署保持惰性、不运行。设置页卡片无改动：客户端 `settings.plugin.item`
+  （key = `dsh-map-tools`）注入与 0.1.3 的 slot 架构一致，工具定义、自有配置路由均不变。
+  （分析报告见 `docs/dsh-map-tools-v0.1.3兼容性说明.md`。）
+- **peerDependencies 提升**：`@deepseek-ai/dsh-settings`、`@deepseek-ai/dsh-tools`
+  由 `^0.1.0-rc.5` 提升到 `>=0.1.2-rc.1`（npm 当前发布线 0.1.2-rc.1 已是新 API；
+  源码构建的 0.1.3-alpha.1 同样兼容）；`@deepseek-ai/cordis` → `^4.0.2`，
+  `@deepseek-ai/schemastery` → `^3.18.2`。
+- **dsh 元数据**：新增 `dsh.compatibility.dshReleases`（`0.1.2-rc.1`、`0.1.3-alpha.1`
+  标记为 `compatible`），对齐 dsh-context 等已适配插件的写法。
+
+### Fixed
+
+- **设置卡片保存后工具未真正重建**：`POST /dsh-map-tools/config` 此前只写入
+  `~/.dsh-map-tools/config.json`，从不触发工具重注册——卡片提示的"已保存 — 工具已重建"
+  在 0.4.x 里实际要到插件重启才生效。现在路由保存成功后立即 reload
+  （`installConfigRoute(ctx, reload)`）；settings section 变更的 `onChange` 路径保持原有行为。
+
 ## [0.4.4] - 2026-08-24
 
 ### Changed

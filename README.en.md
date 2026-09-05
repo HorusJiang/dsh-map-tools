@@ -47,6 +47,8 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 
 > pnpm ≥10 asks you to explicitly allow the package's build script (`prepare`): add the printed package key to the profile's `pnpm-workspace.yaml` under `allowBuilds` and retry.
 
+> **Version requirement**: from 0.5.0 on, this plugin is compatible with **DeepSeek Harness 0.1.2-rc.1 and newer** (including a source-built 0.1.3-alpha.1). Earlier Harness release lines are no longer supported because `@deepseek-ai/dsh-settings` removed its legacy API.
+
 Restart `dsh web` after install (or wait for HMR), then use the `map_*` tools in a session.
 
 > **Development mode**: `dsh plugin add <local-path>` installs via `link:`, so source edits take effect immediately — ideal for iterating on the plugin.
