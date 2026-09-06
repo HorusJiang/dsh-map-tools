@@ -1,4 +1,4 @@
-# dsh-map-tools 发布状态交接（2026-08-21 更新至 v0.4.0）
+# dsh-map-tools 发布状态交接（2026-09-06 更新至 v0.5.0）
 
 > 本文档记录插件发布流程的**全部当前状态**，供随时接续，无需重跑调研。
 
@@ -7,14 +7,14 @@
 | 项目 | 状态 | 证据 |
 |---|---|---|
 | 插件开发 | ✅ | 7 个工具（driving/transit/walking/bicycling route + geocode + reverse_geocode + poi_search），src/ 10 个源文件 |
-| 单元测试 | ✅ | 32 个 vitest 测试（tests/ 6 文件），全绿（2026-08-19 会话实测） |
+| 单元测试 | ✅ | 48 个 vitest 测试（tests/ 8 文件），全绿（2026-09-05 0.5.0 会话实测） |
 | 集成测试 | ✅ | scripts/integration.mjs：OSRM 真实路线返回 + Nominatim 降级引导 + transit key 引导 |
 | 冒烟测试 | ✅ | scripts/smoke.mjs：7 工具注册 + secret 脱敏 + 申请链接 |
 | GitHub CI | ✅ | .github/workflows/ci.yml（build + test）全绿 |
 | GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（28 commit，dsh-plugin topic，prepare 脚本，本地与 origin/master 同步） |
 | git 安装链路 | ✅ | `dsh plugin add github:HorusJiang/dsh-map-tools` 端到端可用（allowBuilds 引导正常） |
-| **npm 发布** | ✅ | **dsh-map-tools@0.4.0 已上线**（CHANGELOG 0.4.0 = 2026-08-21，`dsh plugin add dsh-map-tools` 安装即最新） |
-| **Git tags / Release** | ✅ | annotated tag v0.1.0~v0.4.0 均已推送；**GitHub Release v0.4.0（Latest）已创建**（2026-08-21，notes 基于 CHANGELOG） |
+| **npm 发布** | ✅ | **dsh-map-tools@0.5.0 已上线**（0.5.0 = 2026-09-05，兼容 DSH 0.1.2-rc.1 / 0.1.3-alpha.1；`dsh plugin add dsh-map-tools` 安装即最新） |
+| **Git tags / Release** | ✅ | annotated tag v0.1.0~v0.5.0 均已推送；**GitHub Release v0.5.0（Latest）已创建**（2026-09-06，notes 基于 CHANGELOG） |
 | 收录 PR | ✅ | awesome-dsh-plugin#1842 已提交，**Submission gate 通过**（2026-08-20 11:1x 重跑后 success："repo old enough, enough commits"），mergeable CLEAN |
 | **收录合并** | ✅ | **PR #1842 已由维护者合并（2026-08-20T05:01:27Z，state=MERGED）**，条目已出现在 awesome-dsh-plugin 精选列表；plugins.json 每日刷新后 dshmarket 自动收录 |
 | 一键发布脚本 | ✅ | scripts/publish.mjs（认证守卫 + registry 切换 + 构建 + 发布 + 验证） |
@@ -34,7 +34,7 @@
 # 检查外部条件
 npm whoami                                   # 已登录（horusj），npm 发布已完成
 gh pr checks 1842 --repo awesome-dsh-plugin/awesome-dsh-plugin   # 检查收录 gate
-gh release list                              # 查看 GitHub Release（当前 Latest: v0.3.1）
+gh release list                              # 查看 GitHub Release（当前 Latest: v0.5.0）
 ```
 
 ## 发布流程固化（下次发版照此执行）
@@ -42,10 +42,10 @@ gh release list                              # 查看 GitHub Release（当前 La
 1. 更新 `CHANGELOG.md`（版本段 + 变更分类）。
 2. `package.json` 按 SemVer 提升版本。
 3. `pnpm run build && pnpm test` 全绿。
-4. `git commit`（如 `chore: release v0.3.2`）。
-5. `git tag -a v0.3.2 -m "dsh-map-tools v0.3.2"` + `git push origin master v0.3.2`。
+4. `git commit`（如 `chore: release v0.5.1`）。
+5. `git tag -a v0.5.1 -m "dsh-map-tools v0.5.1"` + `git push origin master v0.5.1`。
 6. `node scripts/publish.mjs` 发布 npm。
-7. `gh release create v0.3.2 --title "dsh-map-tools v0.3.2" --notes-file <notes>` 创建 GitHub Release（notes 用 CHANGELOG 内容）。
+7. `gh release create v0.5.1 --title "dsh-map-tools v0.5.1" --notes-file <notes>` 创建 GitHub Release（notes 用 CHANGELOG 内容）。
 
 ## 关键链接
 

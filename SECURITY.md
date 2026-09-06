@@ -7,8 +7,8 @@ versions receive fixes only when a security issue is backported explicitly.
 
 | Version | Supported |
 |---|---|
-| latest (0.3.x) | ✅ |
-| < 0.3.0 | ❌ |
+| latest (0.5.x) | ✅ |
+| < 0.5.0 | ❌ |
 
 ## How keys are stored
 
@@ -32,8 +32,9 @@ Three layers keep keys out of the repository:
    ignored — even a copy dropped into the workdir is never tracked.
 3. **Pre-commit hook**: `scripts/check-secrets.mjs` scans staged files for
    key-shaped values (e.g. `"amapKey":"<32-hex>"`) and **refuses the commit**
-   on a hit. The hook installs via `scripts/install-hooks.mjs` on
-   `postinstall` for contributors (never for npm consumers). Run manually with
+   on a hit. The hook installs via `pnpm hooks`
+   (`scripts/install-hooks.mjs`, contributors only — never for npm consumers,
+   and the published package carries no build script). Run manually with
    `pnpm check:secrets`.
 
 ## Reporting a vulnerability

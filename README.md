@@ -45,7 +45,7 @@ dsh plugin --profile web add dsh-map-tools
 dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 ```
 
-> pnpm ≥10 会要求你显式允许该包的构建脚本（`prepare`），按提示把包 key 加入该 profile 的 `pnpm-workspace.yaml` 的 `allowBuilds` 后重试即可。
+> 发布包不含 `prepare`/`postinstall` 等构建脚本，pnpm ≥10 安装时**无需**放行构建脚本、也无需配置 `allowBuilds`。
 
 > **版本要求**：自 0.5.0 起，本插件兼容 **DeepSeek Harness 0.1.2-rc.1 及以上**
 > （含源码构建的 0.1.3-alpha.1）。更早的 Harness 发布线因

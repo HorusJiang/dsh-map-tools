@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.1] - 2026-09-06
+
+### Docs
+
+- **修正安装说明**：0.4.2 起发布包已不含 `prepare`/`postinstall` 构建脚本，移除 README
+  （中/英）里"pnpm ≥10 需放行构建脚本"的过时提示，改为"无需放行、无需 allowBuilds"。
+- 同步 SECURITY.md 支持版本表（latest = 0.5.x、< 0.5.0 不受支持）与 pre-commit
+  钩子安装说明（`pnpm hooks`，不再经 postinstall）。
+- 刷新 RELEASE-STATUS.md 状态交接（npm 0.5.0、GitHub Release v0.5.0、48 个单测）。
+
 ## [0.5.0] - 2026-09-05
 
 ### Changed
