@@ -66,9 +66,10 @@ async function traverse(job: ModuleJob) {
 ### 2. 把 profile 的插件副本换成 junction
 
 ```powershell
-$link = 'C:\Users\Horus\.dsh\profiles\web\node_modules\dsh-map-tools'
+# 把 <profile> 与 <repo> 换成你自己的路径（profile 默认在 $env:USERPROFILE\.dsh\profiles\web）
+$link = '<profile>\node_modules\dsh-map-tools'
 Move-Item $link "$link.bak-hmr-copy" -Force
-New-Item -ItemType Junction -Path $link -Target 'D:\projects\DSH\DSH代码学习\04-插件\dsh-map-tools'
+New-Item -ItemType Junction -Path $link -Target '<repo 的绝对路径>'
 ```
 
 Node 解析 symlink/junction 时会取 realpath，于是模块 URL 变成

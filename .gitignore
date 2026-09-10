@@ -44,3 +44,7 @@ Thumbs.db
 
 # Local session handoff (not for public repo)
 PROJECT-SNAPSHOT.md
+
+# 内部思路性材料：只留在本地，绝不提交（曾误提交过一次，已从历史剔除）
+docs/方向A-*.md
+docs/内部-*.md
