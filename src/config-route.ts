@@ -20,7 +20,7 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 /** Refuse cross-origin and non-loopback requests (the route answers same-origin loopback only). */
-function isTrustedRequest(req: IncomingMessage): boolean {
+export function isTrustedRequest(req: IncomingMessage): boolean {
   const host = req.headers?.host
   if (typeof host !== 'string' || host === '') return false
   let hostUrl: URL
@@ -63,14 +63,22 @@ function openConfigFile(): void {
 export function installConfigRoute(ctx: Context, reload: () => void = () => {}): void {
   const fn = ctx.inject as unknown as (
     deps: string[],
-    callback: (scope: { webServer: { register: (route: {
-      kind: 'exact'
-      path: string
-      handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
-    }) => () => void } }) => void,
+    callback: (scope: {
+      webServer: { register: (route: {
+        kind: 'exact'
+        path: string
+        handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>
+      }) => () => void }
+      effect: (setup: () => () => void) => void
+    }) => void,
   ) => unknown
   fn(['webServer'], (scope) => {
-    scope.webServer.register({
+    // register() 的返回值是**唯一的**撤销手段（webserver 的 exact 表里同路径
+    // 重复注册会抛 "duplicate route"，它不是 effect 自动托管的）。所以必须把它
+    // 挂到 effect 上：否则卸载后旧处理器留在表里，而重载时新注册撞重复报错——
+    // 那个错误落在 inject 子作用域内被静默吞掉，路由就永远停在上一个版本
+    // （现象：热替换后工具是新的、回环路由还是旧的）。
+    scope.effect(() => scope.webServer.register({
       kind: 'exact',
       path: '/dsh-map-tools/config',
       handler: async (req: IncomingMessage, res: ServerResponse) => {
@@ -126,6 +134,6 @@ export function installConfigRoute(ctx: Context, reload: () => void = () => {}):
           send(400, { error: String((error as Error)?.message ?? error) })
         }
       },
-    })
+    }))
   })
 }

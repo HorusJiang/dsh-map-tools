@@ -22,6 +22,7 @@ import { Config } from './config.js'
 import type { Config as ConfigType } from './config.js'
 import { readConfig } from './config-file.js'
 import { installConfigRoute } from './config-route.js'
+import { installStaticMapRoute } from './staticmap-route.js'
 import { installSettingsNamespace } from './settings-ns.js'
 
 export const name = 'dsh-map-tools'
@@ -110,19 +111,29 @@ export function apply(ctx: Context, config: ConfigType): void {
   // Register tools under an effect: Cordis runs the returned disposer both on
   // explicit reload (we call it) and on plugin unload (fiber disposal).
   let disposeTools = () => {}
+  /** 当前生效的客户端集合；静态地图回环路由按需读它（保存配置后会被替换）。 */
+  let current: ReturnType<typeof buildClients> | undefined
   ctx.effect(() => {
-    disposeTools = registerAll(ctx, buildClients(config))
-    return () => disposeTools()
+    current = buildClients(config)
+    disposeTools = registerAll(ctx, current)
+    return () => {
+      disposeTools()
+      current = undefined
+    }
   })
 
   const reload = (): void => {
     disposeTools()
-    disposeTools = registerAll(ctx, buildClients(config))
+    current = buildClients(config)
+    disposeTools = registerAll(ctx, current)
   }
 
   // The settings card route + namespace (modlens pattern): the card reads and
   // writes ~/.dsh-map-tools/config.json through the loopback route, and the
   // tools rebuild on a save (route POST → reload).
   installConfigRoute(ctx, reload)
+  // 卡片要的静态地图（真地图 + 高德绘制的路线）也走回环路由：key 留在宿主，
+  // 浏览器只拿图片。没有 amapKey 时路由返回 409，卡片自动退回自绘示意图。
+  installStaticMapRoute(ctx, () => current?.amap)
   installSettingsNamespace(ctx, config, reload)
 }
