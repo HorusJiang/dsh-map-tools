@@ -243,10 +243,22 @@ function routeTool(
           const reversed = parseLngLat(args.origin) !== null || parseLngLat(args.destination) !== null
           lines.push(`起终点：${v.fromName || '?'} → ${v.toName || '?'}${reversed ? '（坐标反查）' : ''}`)
         }
-        for (const s of v.steps.slice(0, 12)) {
-          lines.push(`- ${s.instruction}`)
+        // 分段指引：以前固定只给前 12 步、再加一句"共 N 步"。实测这条截断**就是**
+        // 一连串问题的起因——模型想回答"最后几步怎么进景区大门"，手里却只有前 12 步，
+        // 于是自己去地理编码路口、再算一条分段路线来反推；那条探测路线把卡片占掉，
+        // 用户看到的地图就变成了另一条路线（正文讲主路线、地图画探测）。
+        // 现在给足：≤24 步全给；更长则给前 16 步 + 省略提示 + **最后 6 步**
+        // （到达段永远在，模型没有理由再去补算）。
+        const STEP_MAX = 24
+        const STEP_HEAD = 16
+        const STEP_TAIL = 6
+        if (v.steps.length <= STEP_MAX) {
+          for (const s of v.steps) lines.push(`- ${s.instruction}`)
+        } else {
+          for (const s of v.steps.slice(0, STEP_HEAD)) lines.push(`- ${s.instruction}`)
+          lines.push(`- …（中间省略 ${v.steps.length - STEP_HEAD - STEP_TAIL} 步，共 ${v.steps.length} 步）`)
+          for (const s of v.steps.slice(v.steps.length - STEP_TAIL)) lines.push(`- ${s.instruction}`)
         }
-        if (v.steps.length > 12) lines.push(`- …（共 ${v.steps.length} 步）`)
         if (v.alternatives?.length) {
           lines.push(`另有 ${v.alternatives.length} 条备选路线：`)
           for (const a of v.alternatives) {

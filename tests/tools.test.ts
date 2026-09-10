@@ -195,6 +195,8 @@ describe('起终点可读名称（坐标入参时反查）', () => {
   function namedClients(options: {
     reverse?: (location: [number, number]) => Promise<unknown>
     resolve?: (text: string, signal: AbortSignal) => Promise<[number, number]>
+    /** 高德路线返回的分段（用于验证模型可见文本的分段呈现策略）。 */
+    steps?: Array<{ instruction: string; distanceM: number; durationS: number }>
   } = {}) {
     const { ctx, tools } = makeContext()
     const clients: MapClients = {
@@ -206,7 +208,7 @@ describe('起终点可读名称（坐标入参时反查）', () => {
           polyline: '',
           points: [],
           geometry: [[116.378, 39.865], [116.6, 40.07]],
-          steps: [],
+          steps: options.steps ?? [],
         }),
         reverseGeocode: options.reverse ?? (async () => { throw new Error('reverseGeocode should not be called') }),
       } as never,
@@ -296,6 +298,31 @@ describe('起终点可读名称（坐标入参时反查）', () => {
       expect(def.description).toContain('只镜像')
       expect(def.description).toContain('本回合')
     }
+  })
+
+  it('分段指引不再把"最后几步"藏起来（截断正是模型去算探测路线的起因）', async () => {
+    // 16 步：全部给出（以前只给前 12 步 + "共 16 步"，模型为补全最后几步会自己去
+    // 地理编码路口、再算一条分段路线来反推——那条探测会占掉卡片）。
+    const sixteen = Array.from({ length: 16 }, (_, i) => ({ instruction: `第${i + 1}步`, distanceM: 100, durationS: 10 }))
+    const shortTools = namedClients({ steps: sixteen })
+    const shortDef = shortTools.registered.get('map_driving_route')!
+    // 坐标入参：不触发地名解析（本测试只关心分段怎么呈现）。
+    const shortArgs = { origin: '116.378,39.865', destination: '116.6,40.07' }
+    const shortResult = await shortDef.execute(shortArgs, execCtx)
+    const shortText = shortDef.output.render!(shortArgs, shortResult as never).map((b) => b.text).join('\n')
+    expect(shortText).toContain('第16步')
+    expect(shortText).not.toContain('省略')
+
+    // 40 步：给前 16 + 省略提示 + 最后 6 步（到达段必须在）。
+    const long = Array.from({ length: 40 }, (_, i) => ({ instruction: `第${i + 1}步`, distanceM: 100, durationS: 10 }))
+    const longTools = namedClients({ steps: long })
+    const longDef = longTools.registered.get('map_driving_route')!
+    const longResult = await longDef.execute(shortArgs, execCtx)
+    const longText = longDef.output.render!(shortArgs, longResult as never).map((b) => b.text).join('\n')
+    expect(longText).toContain('第16步')
+    expect(longText).toContain('中间省略 18 步，共 40 步')
+    expect(longText).toContain('第35步')
+    expect(longText).toContain('第40步')
   })
 
   it('地名入参：不打额外的反查请求（省配额）', async () => {
