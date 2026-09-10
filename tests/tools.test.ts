@@ -254,6 +254,50 @@ describe('起终点可读名称（坐标入参时反查）', () => {
     expect(meta).toMatchObject({ kind: 'route', fromName: '长沙南站', toName: '长沙黄花国际机场' })
   })
 
+  it('模型可见文本回显解析后的起终点名称（坐标入参时标注"坐标反查"）', async () => {
+    // 模型传坐标时，它自己看不到那两个坐标是哪儿——回显真名是它发现"传错起点"
+    // 的唯一线索（实测：模型为补全分段而地理编码了别的路口，拿它当了起点）。
+    const tools = namedClients({
+      reverse: async (location) => {
+        const north = location[1] > 40
+        return {
+          provider: 'amap',
+          formatted: north
+            ? '湖南省长沙市长沙县黄花镇长沙黄花国际机场'
+            : '湖南省长沙市雨花区东山街道长沙南站',
+          location,
+          province: '湖南省',
+          city: '长沙市',
+          district: north ? '长沙县' : '雨花区',
+          township: north ? '黄花镇' : '东山街道',
+        }
+      },
+    })
+    const def = tools.registered.get('map_driving_route')!
+    const coordArgs = { origin: '116.378,39.865', destination: '116.6,40.07' }
+    const coordResult = await def.execute(coordArgs, execCtx)
+    const coordText = def.output.render!(coordArgs, coordResult as never).map((b) => b.text).join('\n')
+    expect(coordText).toContain('起终点：长沙南站 → 长沙黄花国际机场（坐标反查）')
+
+    // 地名入参时同样回显，但不该标"坐标反查"。
+    const addressTools = namedClients({ resolve: async () => [116.378, 39.865] })
+    const addressDef = addressTools.registered.get('map_driving_route')!
+    const addressArgs = { origin: '长沙南站', destination: '长沙机场' }
+    const addressResult = await addressDef.execute(addressArgs, execCtx)
+    const addressText = addressDef.output.render!(addressArgs, addressResult as never).map((b) => b.text).join('\n')
+    expect(addressText).toContain('起终点：长沙南站 → 长沙机场')
+    expect(addressText).not.toContain('坐标反查')
+  })
+
+  it('工具描述说明"卡片只镜像本回合的路线调用"（模型行为契约）', () => {
+    const tools = namedClients({})
+    for (const name of ['map_driving_route', 'map_transit_route', 'map_walking_route', 'map_bicycling_route']) {
+      const def = tools.registered.get(name)!
+      expect(def.description).toContain('只镜像')
+      expect(def.description).toContain('本回合')
+    }
+  })
+
   it('地名入参：不打额外的反查请求（省配额）', async () => {
     // reverseGeocode 默认实现会抛错：被调到就说明多发了请求。
     const tools = namedClients({ resolve: async () => [116.378, 39.865] })

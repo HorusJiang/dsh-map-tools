@@ -160,7 +160,12 @@ function routeTool(
   const osrmProfile = mode === 'walking' ? 'walking' : mode === 'bicycling' ? 'cycling' : 'driving'
   return defineTool({
     name,
-    description,
+    // 卡片语义是模型必须知道的：Web 界面里"最终答案下方的地图卡"**只镜像本回合**
+    // 的路线调用。实测踩坑：模型为补全主路线被截断的分段，在回答回合里顺手算了
+    // 一段"别的路口 → 终点"的核对路线，结果卡片画的是那段核对、正文讲的却是主
+    // 路线。这里把规则说清楚，模型要么在本回合重算主路线，要么至少知道自己刚才
+    // 那次调用会占掉卡片。
+    description: `${description} 注意：Web 卡片的路线图只镜像**本回合**的路线调用（本回合算几条就画几条，含为核对细节而算的分段）；回答如果引用更早回合的路线，请在本回合用相同起终点再调用一次。`,
     parameters: {
       origin: { type: 'string', required: true, description: 'Start point: an address, or "lng,lat" coordinates.' },
       destination: { type: 'string', required: true, description: 'End point: an address, or "lng,lat" coordinates.' },
@@ -220,7 +225,7 @@ function routeTool(
           },
         },
       },
-      render: (_args, value) => {
+      render: (args, value) => {
         const v = value as RouteValue
         const mins = (s: number) => Math.round(s / 60)
         const providerName = v.provider === 'amap' ? '高德' : 'OSRM'
@@ -230,6 +235,14 @@ function routeTool(
         const lines = [
           `${providerName} 路线：${distanceText}${durationText}`,
         ]
+        // 回显解析后的起终点名称。坐标入参时这两个名字是**我们按坐标反查出来的**，
+        // 模型自己看不到（它的参数里只有一串数字）——实测踩坑：模型为补全分段
+        // 指引而地理编码了别的路口，却拿它当了起点，于是"算出来的路线"和它想讲
+        // 的完全不是一条。把真名回显出来，模型和读过程区的人都能立刻发现传错。
+        if (v.fromName || v.toName) {
+          const reversed = parseLngLat(args.origin) !== null || parseLngLat(args.destination) !== null
+          lines.push(`起终点：${v.fromName || '?'} → ${v.toName || '?'}${reversed ? '（坐标反查）' : ''}`)
+        }
         for (const s of v.steps.slice(0, 12)) {
           lines.push(`- ${s.instruction}`)
         }
