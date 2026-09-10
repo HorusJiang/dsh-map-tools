@@ -45,6 +45,9 @@ Thumbs.db
 # Local session handoff (not for public repo)
 PROJECT-SNAPSHOT.md
 
-# 内部思路性材料：只留在本地，绝不提交（曾误提交过一次，已从历史剔除）
-docs/方向A-*.md
-docs/内部-*.md
+# docs/ 是本地材料目录：默认整个目录不进版本控制（曾把内部的思路性文档误提交过一次，
+# 已从历史剔除）。已跟踪的三个例外是历史遗留，保留不动；以后新增的 docs 文件一律忽略。
+docs/**
+!docs/awesome-dsh-plugin-submission.yml
+!docs/dsh-map-tools-v0.1.3兼容性说明.md
+!docs/开发-热插拔-HMR.md
