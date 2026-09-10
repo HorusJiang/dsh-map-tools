@@ -62,6 +62,7 @@ interface RouteInternals {
   selectTurnRoutes: (owner: unknown) => { routes: unknown[]; produced?: number } | null
   registerTurnRouteCard: (ctx: unknown) => void
   producedFileCount: (owner: unknown, seq: number) => number
+  MAX_TURN_ROUTES: number
   formatDistance: (meters: number) => string
   formatDuration: (seconds: number) => string
   amapUri: (mode: string, line: Array<[number, number]>, from: string, to: string) => string | null
@@ -504,6 +505,29 @@ describe('回合尾部（最终结果处）的路线卡片', () => {
     expect(route.selectTurnRoutes(owner(undefined))!.produced).toBe(0)
   })
 
+  it('一轮多条路线：**全部保留**（不挑最后一条），按时间顺序交给卡片逐条渲染', () => {
+    // 实测踩坑：用户问 南艳湖→蜀山，模型在同一轮里先算主路线、又算了一条
+    // "望江西路欣塘家园→蜀山"的核对探测；卡片原先只画最后一条，于是正文讲
+    // 主路线、地图却画了探测。现在选择器不挑，全部按 seq 升序返回。
+    const delivered = {
+      routes: [
+        { seq: 191, callId: 'a', toolName: 'map_driving_route' },
+        { seq: 203, callId: 'b', toolName: 'map_driving_route' },
+      ],
+    }
+    const owner = {
+      turn: { data: { get: (key: string) => (key === 'map-routes' ? delivered : undefined) } },
+      seq: 300,
+    }
+    const matched = route.selectTurnRoutes(owner)!
+    expect(matched.routes).toHaveLength(2)
+    // 顺序 = 时间顺序（第一条是模型最先算的，通常是用户问的那条）
+    expect((matched.routes[0] as { seq: number }).seq).toBe(191)
+    expect((matched.routes[1] as { seq: number }).seq).toBe(203)
+    // 上限只影响渲染条数，不影响选择器返回的内容
+    expect(route.MAX_TURN_ROUTES).toBeGreaterThanOrEqual(2)
+  })
+
   it('注册回合尾部时用更低的 priority 先试（否则产出文件行永远抢在前面）', () => {
     const registered: Array<{ options: Record<string, unknown>; component: unknown }> = []
     const injected: string[] = []
@@ -535,7 +559,8 @@ describe('回合尾部（最终结果处）的路线卡片', () => {
     expect(registered[0]!.component).toBeTruthy()
   })
 
-  it('turnRouteModel 复用同一套卡片模型；meta 不合法时返回 null', () => {    const model = route.turnRouteModel({
+  it('turnRouteModel 复用同一套卡片模型；meta 不合法时返回 null', () => {
+    const model = route.turnRouteModel({
       toolName: 'map_driving_route',
       argsRaw: JSON.stringify({ origin: '北京南站', destination: '首都机场' }),
       meta: routeMeta,

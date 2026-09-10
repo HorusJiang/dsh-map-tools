@@ -257,6 +257,12 @@ window.__ModuleLoader__.load({
      * 还是缓存里那张坏图。改动出图逻辑时把它 +1。
      */
     var MAP_URL_VERSION = 2
+    /**
+     * 回合尾部最多逐条渲染几条路线。模型一轮里可能发多条路线调用（主路线 +
+     * 用于核对/备选的探测），每条都要有自己的地图才不会"张冠李戴"；但也不能
+     * 无限堆，超过这个数就只显示前几条并注明总数。
+     */
+    var MAX_TURN_ROUTES = 3
 
     /** 运行中的调用没有 `kind` 字段；已结算的结果节点有。 */
     function isRunning(block) {
@@ -830,6 +836,9 @@ window.__ModuleLoader__.load({
           if (event.type === 'turn/start') return { id: String(event.data.turn), role: 'start' }
           if (event.type === 'tool/call') return { id: String(event.data.turn), role: 'update' }
           if (event.type === 'tool/result') return { id: String(event.data.turn), role: 'update' }
+          // 只累加"带 turn 的事件"：user/message 没有 turn 字段（官方定义用
+          // message id 另起一个节点），所以回合级累加器拿不到用户原话——这也是
+          // 放弃"猜哪条是主路线"、改为把本轮所有路线都画出来的原因。
           return null
         },
         start: function (context, match) {
@@ -908,6 +917,12 @@ window.__ModuleLoader__.load({
         routes.push(all[i])
       }
       if (routes.length === 0) return null
+      // **不再挑"最后一条"**：模型常在同一轮里发多条路线调用（主路线 + 若干用于
+      // 核对/备选的探测，有些直接传坐标、反查出来的地名与用户问的毫不相干）。
+      // 实测踩坑：正文讲南艳湖→蜀山，地图却画了中间那条"望江西路欣塘家园→蜀山"。
+      // 任何"猜哪条是主路线"的启发式都试过并否掉了（收尾正文会引用探测路线的
+      // 坐标，最长公共子串反而给探测更高分）。现在按时间顺序全部交给卡片，
+      // 由卡片逐条渲染 —— 用户问的那条一定在里面。
       return { routes: routes, produced: producedFileCount(owner, seq) }
     }
 
@@ -921,20 +936,40 @@ window.__ModuleLoader__.load({
       var state = useCardState(react)
       var matched = props && props.matched && Array.isArray(props.matched.routes) ? props.matched.routes : []
       if (matched.length === 0) return null
-      var model = turnRouteModel(matched[matched.length - 1])
-      if (!model) return null
-      applyCardState(model, state)
-      var head = [model.label]
-      if (model.summary) head.push(model.summary)
-      var children = [
-        h('div', { key: 'head', style: { fontSize: '12px', color: MUTED, marginBottom: '6px' } }, head.join(' · ')),
-        h('div', { key: 'body' }, RouteBody(h, model)),
-      ]
-      if (matched.length > 1) {
+      // 一轮里可能有多条路线（主路线 + 模型用于核对/备选的探测），**逐条渲染**，
+      // 每条都有自己的地图。之前只画最后一条，导致"正文讲 A→B、地图画 C→B"。
+      var models = []
+      for (var i = 0; i < matched.length && models.length < MAX_TURN_ROUTES; i += 1) {
+        var model = turnRouteModel(matched[i])
+        if (model) models.push(model)
+      }
+      if (models.length === 0) return null
+      // 局部状态（折叠/图片失败）挂在第一条上：其余条目的地图仍按各自 URL 加载，
+      // 加载失败时各自退回自绘示意图由 RouteBody 内部处理。
+      applyCardState(models[0], state)
+      var children = []
+      for (var k = 0; k < models.length; k += 1) {
+        var head = []
+        if (models.length > 1) head.push('第 ' + (k + 1) + '/' + models.length + ' 条')
+        head.push(models[k].label)
+        if (models[k].summary) head.push(models[k].summary)
+        if (k > 0) {
+          children.push(h('div', {
+            key: 'sep' + k,
+            style: { margin: '10px 0 6px', borderTop: '1px solid ' + CARD_BORDER },
+          }))
+        }
+        children.push(h('div', {
+          key: 'head' + k,
+          style: { fontSize: '12px', color: MUTED, marginBottom: '6px' },
+        }, head.join(' · ')))
+        children.push(h('div', { key: 'body' + k }, RouteBody(h, models[k])))
+      }
+      if (matched.length > MAX_TURN_ROUTES) {
         children.push(h('div', {
           key: 'more',
           style: { marginTop: '6px', fontSize: '11.5px', color: MUTED },
-        }, '本轮共 ' + matched.length + ' 条路线，这里显示最后一条'))
+        }, '本轮共 ' + matched.length + ' 条路线，这里显示前 ' + MAX_TURN_ROUTES + ' 条'))
       }
       if (props.matched && props.matched.produced > 0) {
         // 我们把"本轮产出文件"那行挤掉了（单选举席位的代价），至少把数量交代清楚。
@@ -1048,6 +1083,7 @@ window.__ModuleLoader__.load({
       registerRouteCards: registerRouteCards,
       registerTurnRouteCard: registerTurnRouteCard,
       producedFileCount: producedFileCount,
+      MAX_TURN_ROUTES: MAX_TURN_ROUTES,
     }
     return module.exports
   },
