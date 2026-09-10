@@ -45,6 +45,10 @@ Thumbs.db
 # Local session handoff (not for public repo)
 PROJECT-SNAPSHOT.md
 
+# 内部材料：只留在本地，不进公开仓库（曾误提交，已从索引移除）
+PLAN.md
+RELEASE-STATUS.md
+
 # docs/ 是本地材料目录：默认整个目录不进版本控制（曾把内部的思路性文档误提交过一次，
 # 已从历史剔除）。已跟踪的三个例外是历史遗留，保留不动；以后新增的 docs 文件一律忽略。
 docs/**
