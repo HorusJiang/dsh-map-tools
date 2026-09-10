@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## [Unreleased]
+## [0.6.0] - 2026-09-11
 
 ### Added
 
@@ -180,9 +180,14 @@ All notable changes to this project are documented in this file.
   模型版本，换任何 DSH 支持的模型/提供方行为都一样（卡片数据走
   `presentationMeta`，**不进入模型上下文**，这也是它不占 token 的原因）。
 
-- **版本号暂未提升**：当前以本地覆盖的方式装入 `~/.dsh/profiles/web`（profile
-  依赖仍是 `dsh-map-tools@^0.5.1`），此时提版本会让 profile 的依赖解析断档；
-  待发布 npm 时再按 SemVer 提到 0.6.0。
+- **版本：0.5.1 → 0.6.0（0.x 阶段的 MINOR）**。没有破坏性改动——工具名、参数、
+  配置 schema、peer 依赖全未变，只是**新增**输出字段（`geometry` / `fromName` /
+  `toName`）与新的卡片 UI，外加一批修复。`1.0.0` 在 SemVer 里是"承诺 API 稳定"，
+  不是"改动大"，而 DSH 自身还在 0.1.x-rc、插件 API 仍在动（我们刚为 0.1.2/0.1.3 的
+  设置 API 做过迁移），所以不动大版本。
+  本机 `~/.dsh/profiles/web` 里的 `dsh-map-tools` 是**指向本仓库的 junction**，
+  跑的就是工作树、不依赖 npm 上的版本；若把 profile 改回 npm 依赖，记得把范围提到
+  `^0.6.0`（0.x 的 caret 只允许同 minor，`^0.5.1` 装不到 0.6.0）。
 - **不使用 `presentCall` / `presentResult`**：DSH 内置 Web 客户端不消费它们
   （`packages/core/tools/README.md`、`docs/cookbook/adding-a-tool.md`），
   UI 侧唯一入口是 `tool.call.toolview`。调研与证据见

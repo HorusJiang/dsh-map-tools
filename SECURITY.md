@@ -7,8 +7,8 @@ versions receive fixes only when a security issue is backported explicitly.
 
 | Version | Supported |
 |---|---|
-| latest (0.5.x) | ✅ |
-| < 0.5.0 | ❌ |
+| latest (0.6.x) | ✅ |
+| < 0.6.0 | ❌ |
 
 ## How keys are stored
 
