@@ -15,8 +15,8 @@
 | GitHub CI | ✅ | .github/workflows/ci.yml（build + test）全绿 |
 | GitHub 仓库 | ✅ | HorusJiang/dsh-map-tools（dsh-plugin topic，prepare 脚本） |
 | git 安装链路 | ✅ | `dsh plugin add github:HorusJiang/dsh-map-tools` 端到端可用（allowBuilds 引导正常） |
-| **npm 发布** | ⏳ | 0.5.1 已上线；**0.6.0 待发布**（`node scripts/publish.mjs`，本机已登录 horusj，registry.npmjs.org 可达） |
-| **Git tags / Release** | ⏳ | annotated tag v0.1.0~v0.5.1 已推送；**v0.6.0 待打**（本机 github.com 不可达，推送需代理或在可联网环境执行） |
+| **npm 发布** | ✅ | **dsh-map-tools@0.6.0 已上线（2026-09-11，latest）**；0.5.1 为上一版 |
+| **Git tags / Release** | ✅ | annotated tag v0.1.0~v0.6.0 均已推送；**GitHub Release v0.6.0（Latest）已创建**（2026-09-11，notes 基于 CHANGELOG） |
 | 收录 PR | ✅ | awesome-dsh-plugin#1842 已合并（2026-08-20），条目已进精选列表，dshmarket 每日刷新自动收录 |
 | 一键发布脚本 | ✅ | scripts/publish.mjs（认证守卫 + registry 切换 + 构建 + 发布 + 验证） |
 
@@ -35,12 +35,13 @@
 # 检查外部条件
 npm whoami                                   # 已登录（horusj）；registry.npmjs.org 本机可达
 gh pr checks 1842 --repo awesome-dsh-plugin/awesome-dsh-plugin   # 检查收录 gate
-gh release list                              # 查看 GitHub Release（Latest: v0.5.1；v0.6.0 待创建）
+gh release list                              # 查看 GitHub Release（Latest: v0.6.0）
 ```
 
-> ⚠️ **本机网络**：`github.com:443` 不可达（无代理），`registry.npmjs.org` 可达。
-> 因此 `git push` / `gh release` 需要先在可联网环境（或配好代理）执行；
-> `node scripts/publish.mjs` 可直接跑。
+> ⚠️ **本机网络**：GitHub 需要走**系统代理**（`127.0.0.1:7892`）。`gh` 会自动使用它；
+> **`git` 不会**，push/pull 要显式带上：
+> `git -c http.proxy=http://127.0.0.1:7892 -c https.proxy=http://127.0.0.1:7892 push origin master`
+> （或一次性写进 `git config --global http.proxy …`）。npm registry 直连可达。
 
 ## 发布流程固化（下次发版照此执行）
 

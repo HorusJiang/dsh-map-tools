@@ -56,11 +56,24 @@ run('npm pack --dry-run')
 run('npm publish --access public')
 
 // 6. Verify
+// npm 的读路径走 CDN，刚 publish 完立刻 `npm view` 可能先拿到 404（实测 0.6.0
+// 发布时就是这样：包已经上线、dist-tag 也已指向它，但首次查询报 "No match found"）。
+// 这里重试几次再判，避免把"已经成功"的发布误判成失败并让脚本崩掉。
 const version = check('node -p "require(\'./package.json\').version"')
 const name = check('node -p "require(\'./package.json\').name"')
-const published = check(`npm view ${name}@${version} version`).split('\n').pop()
+let published = ''
+for (let attempt = 1; attempt <= 6; attempt += 1) {
+  try {
+    published = check(`npm view ${name}@${version} version`).split('\n').pop().trim()
+    break
+  } catch (error) {
+    console.log(`  verify attempt ${attempt}/6 did not see ${name}@${version} yet (registry CDN propagation)`)
+    if (attempt < 6) await new Promise((resolve) => setTimeout(resolve, 5000))
+  }
+}
 if (published === version) {
   console.log(`\n✅ Published ${name}@${version} — https://www.npmjs.com/package/${name}`)
 } else {
-  console.warn(`\n⚠️ Published version ${version} not confirmed (got: ${published}); check npmjs.com manually.`)
+  console.warn(`\n⚠️ Published version ${version} not confirmed (got: ${published || 'not found'}); check npmjs.com manually.`)
+  console.warn('   （发布本身很可能已经成功——npm 写入与 CDN 读取是两个路径。）')
 }
