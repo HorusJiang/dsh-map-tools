@@ -813,10 +813,21 @@ window.__ModuleLoader__.load({
     // 工具卡片渲染在回合的**过程区**（"思考"块里，随时可能被折叠），所以只看
     // 最终答案的人看不到地图。这里按 ui-deliverables 的做法自己折叠本轮的
     // 路线结果（注册一个 conversation node definition），再注册到回合尾部的
-    // 链式槽位 conversation.chat.turnTail —— 地图就会出现在收尾正文之后。
+    // 槽位 conversation.chat.turnTail —— 地图就会出现在收尾正文之后。
+    //
+    // 该槽位的**类型随宿主版本变过**（见 docs/dsh-map-tools-0.1.6兼容性说明.md）：
+    //   · ≤ 0.1.6-alpha.1：kind 'chain' —— 必填 `select`，组件从 props.matched 取数；
+    //   · ≥ 0.1.6-alpha.2：kind 'list'  —— 必填 `id`，不注入 matched，组件自推导。
+    // 所以下面读槽位声明决定注册形状，一份 bundle 同时吃两种宿主。
 
     /** 本轮路线的 Turn 级数据键（Definition 与选择器共用）。 */
     var ROUTE_TURN_KEY = 'map-routes'
+
+    /** 回合尾部槽位名（0.1.6-alpha.2 起由链式改为列表式）。 */
+    var TURN_TAIL_SLOT = 'conversation.chat.turnTail'
+
+    /** 列表式槽位必填的注册 id：稳定、全局唯一；链式宿主上被忽略。 */
+    var TURN_TAIL_ID = 'dsh-map-tools-turn-routes'
 
     /** 线级工具名是否是我们的路线工具。 */
     function isRouteTool(name) {
@@ -927,23 +938,52 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * 回合尾部的路线卡片：只画本轮**最后一条**路线（多条时给一句提示），
+     * 卡片模型（纯函数、不碰 react）：收出本轮要渲染的路线数、产出文件数与
+     * "是否挤掉了官方产出文件行"。
+     *
+     * 这里就是两种槽位语义的**唯一适配点**：
+     *   · chain（≤ 0.1.6-alpha.1）：框架把选择器结果当 `props.matched` 送进来；
+     *     那是单选举席，我们当选就挤掉了官方"本轮产出文件"行 → displaced。
+     *   · list（≥ 0.1.6-alpha.2）：没有 `matched`，从 ownerProps（turn / seq）
+     *     自己推导（每次渲染都会跑一次，选择器保持纯函数）；官方产出文件卡
+     *     与我们同时出现，没有挤掉谁 → 不 displaced。
+     *
+     * @returns 模型对象；本轮没有可画的路线时返回 null（卡片整块不渲染）。
+     */
+    function turnRouteCardModel(props) {
+      var owner = props || {}
+      var chainMatched = owner.matched && Array.isArray(owner.matched.routes) ? owner.matched : null
+      var selected = chainMatched || selectTurnRoutes(owner)
+      if (!selected) return null
+      var routes = Array.isArray(selected.routes) ? selected.routes : []
+      if (routes.length === 0) return null
+      // 一轮里可能有多条路线（主路线 + 模型用于核对/备选的探测），**逐条渲染**，
+      // 每条都有自己的地图。之前只画最后一条，导致"正文讲 A→B、地图画 C→B"。
+      var models = []
+      for (var i = 0; i < routes.length && models.length < MAX_TURN_ROUTES; i += 1) {
+        var model = turnRouteModel(routes[i])
+        if (model) models.push(model)
+      }
+      if (models.length === 0) return null
+      return {
+        models: models,
+        total: routes.length,
+        produced: typeof selected.produced === 'number' ? selected.produced : 0,
+        displaced: chainMatched !== null,
+      }
+    }
+
+    /**
+     * 回合尾部的路线卡片：本轮算了几条就逐条画（每条一张地图），
      * 与工具卡片复用同一套 body 与降级逻辑。
      */
     function TurnRouteCard(props) {
       var react = require('react')
       var h = react.createElement
       var state = useCardState(react)
-      var matched = props && props.matched && Array.isArray(props.matched.routes) ? props.matched.routes : []
-      if (matched.length === 0) return null
-      // 一轮里可能有多条路线（主路线 + 模型用于核对/备选的探测），**逐条渲染**，
-      // 每条都有自己的地图。之前只画最后一条，导致"正文讲 A→B、地图画 C→B"。
-      var models = []
-      for (var i = 0; i < matched.length && models.length < MAX_TURN_ROUTES; i += 1) {
-        var model = turnRouteModel(matched[i])
-        if (model) models.push(model)
-      }
-      if (models.length === 0) return null
+      var card = turnRouteCardModel(props)
+      if (!card) return null
+      var models = card.models
       // 局部状态（折叠/图片失败）挂在第一条上：其余条目的地图仍按各自 URL 加载，
       // 加载失败时各自退回自绘示意图由 RouteBody 内部处理。
       applyCardState(models[0], state)
@@ -965,18 +1005,19 @@ window.__ModuleLoader__.load({
         }, head.join(' · ')))
         children.push(h('div', { key: 'body' + k }, RouteBody(h, models[k])))
       }
-      if (matched.length > MAX_TURN_ROUTES) {
+      if (card.total > MAX_TURN_ROUTES) {
         children.push(h('div', {
           key: 'more',
           style: { marginTop: '6px', fontSize: '11.5px', color: MUTED },
-        }, '本轮共 ' + matched.length + ' 条路线，这里显示前 ' + MAX_TURN_ROUTES + ' 条'))
+        }, '本轮共 ' + card.total + ' 条路线，这里显示前 ' + MAX_TURN_ROUTES + ' 条'))
       }
-      if (props.matched && props.matched.produced > 0) {
-        // 我们把"本轮产出文件"那行挤掉了（单选举席位的代价），至少把数量交代清楚。
+      if (card.displaced && card.produced > 0) {
+        // 只在链式槽位下说这句：那是单选举席，我们把"本轮产出文件"那行挤掉了
+        // （代价），至少把数量交代清楚。列表式槽位下官方那行照常渲染，无需多言。
         children.push(h('div', {
           key: 'produced',
           style: { marginTop: '6px', fontSize: '11.5px', color: MUTED },
-        }, '本轮另有 ' + props.matched.produced + ' 个产出文件（地图卡占用此行，文件见过程区）'))
+        }, '本轮另有 ' + card.produced + ' 个产出文件（地图卡占用此行，文件见过程区）'))
       }
       return h('div', {
         style: {
@@ -1005,6 +1046,78 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 读槽位当前的声明类型（`chain` / `list` / `single` / `keyed`）。
+     *
+     * 这是"插件跟着宿主版本走"的关键：0.1.6-alpha.2 把 turnTail 从 chain 改成了
+     * list，两者要求的注册字段互斥（chain 要 `select`、list 要 `id`，缺了就抛），
+     * 而**读声明**比猜版本号可靠——宿主小版本号无法枚举，同一份 bundle 却能靠它
+     * 在两个宿主上都注册成功。
+     *
+     * @returns 类型字符串；读不到（老宿主无 spec()、槽位未声明、服务形状变了）返回 undefined。
+     */
+    function slotKind(scope, name) {
+      try {
+        var slots = scope && scope.slots
+        if (!slots || typeof slots.spec !== 'function') return undefined
+        var spec = slots.spec(name)
+        return spec && typeof spec.kind === 'string' ? spec.kind : undefined
+      } catch (error) {
+        return undefined
+      }
+    }
+
+    /** 列表式注册：`id` 必填、同 id 同 priority 唯一；组件自己推导数据。 */
+    function registerTurnTailAsList(scope) {
+      // priority -1：列表式按 priority 升序渲染，排到官方"本轮文件改动"卡
+      // （默认 0）前面，地图卡仍然紧贴正文。
+      return scope.slots.register({
+        name: TURN_TAIL_SLOT,
+        id: TURN_TAIL_ID,
+        priority: -1,
+      }, TurnRouteCard)
+    }
+
+    /** 链式注册：`select` 必填；框架把选择器结果作为 props.matched 送进组件。 */
+    function registerTurnTailAsChain(scope) {
+      // 回合尾部是**单选**链式槽位（第一个非空 select 当选；同优先级按注册
+      // 顺序）。ui-deliverables 在 web 组合里先注册，所以用默认优先级时，
+      // 只要本轮产出了文件它就当选，地图卡永远轮不到（实测：我的回合几乎
+      // 必然写文件，于是地图一直不显示）。用更低的 priority 让我们**先试**：
+      //   · 本轮有路线 → 我们当选，并在卡里注明"另有 N 个产出文件"；
+      //   · 本轮没路线 → 我们返回 null 弃权，官方的产出文件行照常渲染。
+      return scope.slots.register({
+        name: TURN_TAIL_SLOT,
+        priority: -1,
+        select: selectTurnRoutes,
+      }, TurnRouteCard)
+    }
+
+    /**
+     * 按宿主**实际**的槽位类型注册回合尾部卡片。
+     *
+     * 类型未知时按 list → chain 依次试：list 槽位缺 `id` 会抛、chain 槽位缺
+     * `select` 也会抛，而两者的校验都发生在写入账本之前（ui-slots register 的
+     * 类型检查在最前），所以失败的尝试不留副作用。
+     */
+    function registerTurnTail(scope) {
+      var kind = slotKind(scope, TURN_TAIL_SLOT)
+      if (kind === 'chain') return registerTurnTailAsChain(scope)
+      if (kind === 'list') return registerTurnTailAsList(scope)
+      try {
+        return registerTurnTailAsList(scope)
+      } catch (listError) {
+        try {
+          return registerTurnTailAsChain(scope)
+        } catch (chainError) {
+          // 两条路都堵上时把两个原因都带出来，别让回退把 list 的真实错误吞掉
+          // （例如同 id 同 priority 的重复注册，HMR 重载时最容易撞）。
+          throw new Error('neither list nor chain registration worked — list: '
+            + listError + '; chain: ' + chainError)
+        }
+      }
+    }
+
+    /**
      * 注册回合尾部的路线卡片。
      *
      * 两处注册相互独立、各自兜错：回合折叠定义失败不该影响工具卡片，
@@ -1020,18 +1133,16 @@ window.__ModuleLoader__.load({
           console.error('[dsh-map-tools] route turn definition skipped: ' + error)
         }
         try {
-          scope.slots.inject('conversation.chat.turnTail', function () {
-            return scope.slots.register({
-              name: 'conversation.chat.turnTail',
-              // 回合尾部是**单选**链式槽位（第一个非空 select 当选；同优先级按注册
-              // 顺序）。ui-deliverables 在 web 组合里先注册，所以用默认优先级时，
-              // 只要本轮产出了文件它就当选，地图卡永远轮不到（实测：我的回合几乎
-              // 必然写文件，于是地图一直不显示）。用更低的 priority 让我们**先试**：
-              //   · 本轮有路线 → 我们当选，并在卡里注明"另有 N 个产出文件"；
-              //   · 本轮没路线 → 我们返回 null 弃权，官方的产出文件行照常渲染。
-              priority: -1,
-              select: selectTurnRoutes,
-            }, TurnRouteCard)
+          scope.slots.inject(TURN_TAIL_SLOT, function () {
+            // 兜错**必须写在工厂体里**：`slots.inject()` 只登记这个工厂，它由框架
+            // 在槽位声明之后调用（声明已存在时同步、否则异步），抛错发生在包住
+            // inject 的那个 try/catch 之外——早先版本正是因此在控制台留下 page error。
+            try {
+              return registerTurnTail(scope)
+            } catch (error) {
+              console.error('[dsh-map-tools] route turn tail skipped: ' + error)
+              return function () {}
+            }
           })
         } catch (error) {
           console.error('[dsh-map-tools] route turn tail skipped: ' + error)
@@ -1074,8 +1185,15 @@ window.__ModuleLoader__.load({
       staticMapUrl: staticMapUrl,
       sketchSvg: sketchSvg,
       turnRouteModel: turnRouteModel,
+      turnRouteCardModel: turnRouteCardModel,
       routeTurnDefinition: routeTurnDefinition,
       selectTurnRoutes: selectTurnRoutes,
+      slotKind: slotKind,
+      registerTurnTail: registerTurnTail,
+      registerTurnTailAsList: registerTurnTailAsList,
+      registerTurnTailAsChain: registerTurnTailAsChain,
+      TURN_TAIL_SLOT: TURN_TAIL_SLOT,
+      TURN_TAIL_ID: TURN_TAIL_ID,
       formatDistance: formatDistance,
       formatDuration: formatDuration,
       amapUri: amapUri,

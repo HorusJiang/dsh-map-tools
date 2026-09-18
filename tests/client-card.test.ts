@@ -6,7 +6,7 @@
  * 假 window 捕获 factory，再手工执行它拿到 exports。
  */
 
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 /** factory 里 require 到的模块（渲染时才用，本测试只测纯函数）。 */
 const requireStub = (spec: string): unknown => {
@@ -52,6 +52,12 @@ interface RouteInternals {
     frame: { aspect: number; requestW: number; requestH: number },
   ) => string
   turnRouteModel: (entry: unknown) => Record<string, unknown> | null
+  turnRouteCardModel: (props: unknown) => {
+    models: Array<Record<string, unknown>>
+    total: number
+    produced: number
+    displaced: boolean
+  } | null
   routeTurnDefinition: () => {
     kind: string
     match: (event: unknown) => { id: string; role: string } | null
@@ -60,6 +66,12 @@ interface RouteInternals {
     buildLocationData: (context: unknown, scope: string, previous: unknown) => unknown
   }
   selectTurnRoutes: (owner: unknown) => { routes: unknown[]; produced?: number } | null
+  slotKind: (scope: unknown, name: string) => string | undefined
+  registerTurnTail: (scope: unknown) => unknown
+  registerTurnTailAsList: (scope: unknown) => unknown
+  registerTurnTailAsChain: (scope: unknown) => unknown
+  TURN_TAIL_SLOT: string
+  TURN_TAIL_ID: string
   registerTurnRouteCard: (ctx: unknown) => void
   producedFileCount: (owner: unknown, seq: number) => number
   MAX_TURN_ROUTES: number
@@ -528,35 +540,157 @@ describe('回合尾部（最终结果处）的路线卡片', () => {
     expect(route.MAX_TURN_ROUTES).toBeGreaterThanOrEqual(2)
   })
 
-  it('注册回合尾部时用更低的 priority 先试（否则产出文件行永远抢在前面）', () => {
-    const registered: Array<{ options: Record<string, unknown>; component: unknown }> = []
-    const injected: string[] = []
-    const slots = {
+  /**
+   * 复刻 ui-slots 注册校验的最小假 slots：按宿主真实语义复现必填字段检查
+   * （list 缺 id 抛、chain 缺 select 抛），且抛错发生在写入账本之前。
+   *
+   * @param specKind 宿主 `spec()` 报出的槽位类型；`null` 表示宿主没有 `spec()`。
+   * @param hostKind 宿主注册时的**真实**校验语义（可与 specKind 不一致，用于模拟
+   *                 更老的、读不到声明的宿主）。
+   */
+  function fakeSlots(
+    specKind: string | null,
+    hostKind: string,
+    log: Array<{ options: Record<string, unknown>; component: unknown }>,
+    injected: string[],
+  ) {
+    const slots: Record<string, unknown> = {
       inject: (name: string, cb: () => unknown) => {
         injected.push(name)
         cb()
       },
       register: (options: Record<string, unknown>, component: unknown) => {
-        registered.push({ options, component })
+        if (hostKind === 'list' && options.id === undefined) {
+          throw new Error('list slot "conversation.chat.turnTail" requires options.id')
+        }
+        if (hostKind === 'chain' && options.select === undefined) {
+          throw new Error('chain slot "conversation.chat.turnTail" requires options.select')
+        }
+        log.push({ options, component })
         return () => {}
       },
     }
-    const ctx = {
-      inject: (deps: string[], cb: (scope: unknown) => void) => cb({
-        uiConversation: { events: { register: () => {} } },
-        slots,
-      }),
-    }
-    route.registerTurnRouteCard(ctx)
+    if (specKind !== null) slots.spec = () => ({ kind: specKind, scope: 'session' })
+    return slots
+  }
+
+  /** 用假 slots 走一遍真实注册入口（ctx.inject 的回调里就是插件拿到的 scope）。 */
+  function registerInto(slots: unknown): void {
+    route.registerTurnRouteCard({
+      inject: (_deps: string[], cb: (scope: unknown) => void) => {
+        cb({ uiConversation: { events: { register: () => {} } }, slots })
+      },
+    })
+  }
+
+  it('list 宿主（≥ 0.1.6-alpha.2）：注册带 id、不带 select（否则控制台报错且卡片不渲染）', () => {
+    const registered: Array<{ options: Record<string, unknown>; component: unknown }> = []
+    const injected: string[] = []
+    registerInto(fakeSlots('list', 'list', registered, injected))
 
     expect(injected).toEqual(['conversation.chat.turnTail'])
     expect(registered).toHaveLength(1)
     expect(registered[0]!.options.name).toBe('conversation.chat.turnTail')
+    expect(registered[0]!.options.id).toBe(route.TURN_TAIL_ID)
+    expect(registered[0]!.options.select).toBeUndefined()
+    // 列表式按 priority 升序渲染：仍要排在官方"本轮文件改动"卡（默认 0）前面。
+    expect(registered[0]!.options.priority).toBeLessThan(0)
+    expect(registered[0]!.component).toBeTruthy()
+  })
+
+  it('chain 宿主（≤ 0.1.6-alpha.1）：注册带 select、不带 id，priority 同样更低', () => {
+    const registered: Array<{ options: Record<string, unknown>; component: unknown }> = []
+    registerInto(fakeSlots('chain', 'chain', registered, []))
+
+    expect(registered).toHaveLength(1)
     // 链式槽位是单选：第一个非空 select 当选，同优先级按注册顺序。ui-deliverables
     // 在 web 组合里先注册，所以**必须**用更低的 priority 才能让地图卡有机会出现。
-    expect(registered[0]!.options.priority).toBeLessThan(0)
     expect(typeof registered[0]!.options.select).toBe('function')
-    expect(registered[0]!.component).toBeTruthy()
+    expect(registered[0]!.options.id).toBeUndefined()
+    expect(registered[0]!.options.priority).toBeLessThan(0)
+  })
+
+  it('宿主读不到槽位类型时先试 list；宿主其实是 chain 时自动回退到 select 形状', () => {
+    const listHost: Array<{ options: Record<string, unknown>; component: unknown }> = []
+    registerInto(fakeSlots(null, 'list', listHost, []))
+    expect(listHost).toHaveLength(1)
+    expect(listHost[0]!.options.id).toBe(route.TURN_TAIL_ID)
+
+    const chainHost: Array<{ options: Record<string, unknown>; component: unknown }> = []
+    registerInto(fakeSlots(null, 'chain', chainHost, []))
+    expect(chainHost).toHaveLength(1)
+    expect(typeof chainHost[0]!.options.select).toBe('function')
+    expect(chainHost[0]!.options.id).toBeUndefined()
+  })
+
+  it('两种形状都注册不上时只记日志，不把异常抛回宿主（工厂在 inject 之外执行）', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const registered: Array<{ options: Record<string, unknown>; component: unknown }> = []
+      const slots = fakeSlots(null, 'list', registered, [])
+      ;(slots as { register: unknown }).register = () => { throw new Error('boom') }
+      expect(() => registerInto(slots)).not.toThrow()
+      expect(registered).toHaveLength(0)
+      expect(errors).toHaveBeenCalled()
+      // 回退不能把第一次（list）的真实错误吞掉。
+      expect(String(errors.mock.calls[0]![0])).toContain('boom')
+    } finally {
+      errors.mockRestore()
+    }
+  })
+
+  it('turnRouteCardModel：链式槽位用 props.matched，并标记"挤掉了产出文件行"', () => {
+    const model = route.turnRouteCardModel({
+      matched: {
+        routes: [{ toolName: 'map_driving_route', argsRaw: JSON.stringify({ origin: '北京南站', destination: '首都机场' }), meta: routeMeta }],
+        produced: 2,
+      },
+    })!
+    expect(model.models).toHaveLength(1)
+    expect(model.total).toBe(1)
+    expect(model.produced).toBe(2)
+    // 单选举席：我们当选就挤掉了官方那行，才需要自己交代产出文件数。
+    expect(model.displaced).toBe(true)
+  })
+
+  it('turnRouteCardModel：列表式槽位没有 matched，从 ownerProps 自己推导', () => {
+    const owner = {
+      turn: {
+        data: {
+          get: (key: string) => (key === 'map-routes'
+            ? {
+              routes: [{
+                toolName: 'map_driving_route',
+                argsRaw: JSON.stringify({ origin: '北京南站', destination: '首都机场' }),
+                meta: routeMeta,
+                seq: 10,
+              }],
+            }
+            : key === 'deliverables' ? { produced: [{ seq: 5 }] } : undefined),
+        },
+      },
+      seq: 100,
+    }
+    const model = route.turnRouteCardModel(owner)!
+    expect(model.models).toHaveLength(1)
+    expect(model.produced).toBe(1)
+    // 列表式槽位下官方产出文件卡与我们同时渲染，不存在"挤掉"。
+    expect(model.displaced).toBe(false)
+  })
+
+  it('turnRouteCardModel：没有可画路线（无 matched 且推导为空）时返回 null', () => {
+    expect(route.turnRouteCardModel(null)).toBeNull()
+    expect(route.turnRouteCardModel({ turn: { data: { get: () => undefined } }, seq: 1 })).toBeNull()
+    // matched 存在但里面没有合法路线 → 不发卡片，也不留空白占位。
+    expect(route.turnRouteCardModel({ matched: { routes: [{ toolName: 'map_geocode' }], produced: 0 } })).toBeNull()
+  })
+
+  it('slotKind 读不到声明（无 spec / spec 抛错）时返回 undefined，交给注册兜底', () => {
+    expect(route.slotKind(undefined, route.TURN_TAIL_SLOT)).toBeUndefined()
+    expect(route.slotKind({ slots: {} }, route.TURN_TAIL_SLOT)).toBeUndefined()
+    expect(route.slotKind({ slots: { spec: () => undefined } }, route.TURN_TAIL_SLOT)).toBeUndefined()
+    expect(route.slotKind({ slots: { spec: () => { throw new Error('nope') } } }, route.TURN_TAIL_SLOT)).toBeUndefined()
+    expect(route.slotKind({ slots: { spec: () => ({ kind: 'list' }) } }, route.TURN_TAIL_SLOT)).toBe('list')
   })
 
   it('turnRouteModel 复用同一套卡片模型；meta 不合法时返回 null', () => {

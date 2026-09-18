@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.1] - 2026-09-18
+
+### Fixed
+
+- **DSH 0.1.6-alpha.2 下回合尾部的地图卡片不显示。** 该版本把客户端槽位
+  `conversation.chat.turnTail` 的类型从 `chain` 改成了 `list`，两者要求的注册
+  字段互斥：`list` 必填 `id`（缺了注册即抛 `list slot … requires options.id`，
+  且抛错发生在 `slots.inject()` 登记的工厂里、工厂由框架稍后调用，包在
+  `inject` 外面的 `try/catch` **抓不到**，直接冒泡成控制台 page error），并且
+  `list` 不再注入 `matched`，组件拿不到数据会静默返回 `null`——两处叠加就是
+  "控制台报错 + 卡片完全不渲染"。
+- 修复方式不是写死宿主版本号，而是**按槽位实际声明自适应**（对齐 README 的
+  "插件跟着宿主版本走"）：运行时读 `slots.spec('conversation.chat.turnTail')`
+  的 `kind` —— `chain` 就注册 `select`、`list` 就注册 `id`；读不到声明时按
+  list → chain 依次试（两种语义的必填校验都在写入账本之前，失败尝试无副作用）。
+  一份构建同时支持 `0.1.6-alpha.1`（chain）与 `0.1.6-alpha.2`（list），
+  不必按版本分叉发布。
+- 组件侧把取数逻辑从 `props.matched` 抽成纯函数 `turnRouteCardModel(props)`：
+  有 `matched` 就用（链式宿主），没有就从 ownerProps（`turn` / `seq`）自己推导
+  （列表式宿主），顺带成为可直接单测的入口。卡片对"本轮另有 N 个产出文件"的
+  提示只在**链式**宿主下显示——那里是单选举席、确实挤掉了官方那行；列表式宿主
+  下官方"本轮文件改动"卡与我们同时渲染，再提示就是多余的。
+
+### Changed
+
+- `dsh.compatibility.dshReleases` 增加 `0.1.6-alpha.1`、`0.1.6-alpha.2`；
+  README 的版本说明同步更新。
+
 ## [0.6.0] - 2026-09-11
 
 ### Added

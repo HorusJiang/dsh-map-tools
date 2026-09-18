@@ -95,7 +95,8 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 **版本要求**
 
 - **DeepSeek Harness ≥ 0.1.2-rc.1**（peer 依赖：`@deepseek-ai/dsh-settings`、`@deepseek-ai/dsh-tools`、`@deepseek-ai/cordis` ^4.0.2）。更早的发布线因 `@deepseek-ai/dsh-settings` 移除旧 API 而不再支持。
-- 已在 **DSH 0.1.5-rc.1 + Node v24** 实测全部功能；已兼容版本记录在 `package.json` 的 `dsh.compatibility.dshReleases`。
+- 已在 **DSH 0.1.6-alpha.2 / 0.1.6-alpha.1 + Node v24** 实测全部功能；已兼容版本记录在 `package.json` 的 `dsh.compatibility.dshReleases`。
+- **插件不写死宿主版本号**：客户端卡片按**槽位实际声明**适配。`conversation.chat.turnTail` 在 0.1.6-alpha.2 由链式（`chain`，要 `select`）改成列表式（`list`，要 `id`），插件运行时读 `slots.spec()` 决定注册形状，因此同一份构建在两条发布线上都能让回合尾部的路线卡片正常出现（详见 [docs/dsh-map-tools-0.1.6兼容性说明.md](docs/dsh-map-tools-0.1.6兼容性说明.md)）。
 - **Node ≥ 20**。
 - 路线地图卡与设置卡片需要 **web profile**（`dsh.client.platform: web`）。TUI / headless 下 7 个工具照常可用，只是没有图形卡片。
 
@@ -308,7 +309,7 @@ A：不会。卡片数据走 `presentationMeta` 持久化，不进入模型上�
 A：不需要。7 个工具都是 DSH 原生工具。
 
 **Q：支持哪些 DSH 版本？**
-A：DSH ≥ 0.1.2-rc.1；已在 0.1.5-rc.1 实测。详见[安装](#安装)。
+A：DSH ≥ 0.1.2-rc.1；已在 0.1.6-alpha.2 与 0.1.6-alpha.1 实测（回合尾部槽位语义在这两版之间变过，插件按槽位声明自适应，无需换版本）。详见[安装](#安装)。
 
 ## 开发
 
