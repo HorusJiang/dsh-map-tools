@@ -341,18 +341,31 @@ Full conventions: [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 
 ## Publishing
 
+Releases are run by CI ([`.github/workflows/release.yml`](.github/workflows/release.yml)), and they are **two steps — the second one is a human**:
+
 ```sh
-npm login                     # npm account (npm >= 11.15.0 for the two-step flow)
-node scripts/publish.mjs      # one shot: auth → build → test → pack check → publish → verify installability
-node scripts/publish.mjs --stage          # two-step: stage only, then a maintainer approves with 2FA
-node scripts/publish.mjs --verify-only    # verify one version is genuinely installable (sha1 compared)
+# 1. The tag triggers it: CI runs the same gates CI runs, then `npm stage publish`
+#    only stages the package (nothing is installable yet)
 git tag -a vX.Y.Z -m "dsh-map-tools X.Y.Z" && git push origin vX.Y.Z
+
+# 2. A maintainer approves with 2FA, then publishes the draft Release CI left behind
+#    (all three commands are printed in the run summary)
+npm stage list dsh-map-tools
+npm stage approve <stage-id>
+gh release edit vX.Y.Z --draft=false
 ```
 
-How npm behaves now (the "bypass-2FA publish token" advice in older docs is obsolete):
+Why two steps: the npm **trusted publisher is granted staged publishing only** (`npm publish` is not among its allowed actions), so a compromised workflow cannot put a package in front of the world on its own — the tag says "this is a release candidate", the 2FA prompt says "and this is a release". The one-time setup (add a GitHub Actions trusted publisher in the package's settings, leaving `npm publish` unchecked) is documented in the header of release.yml.
 
-- With 2FA enabled, npm offers **staged publishing**: `npm stage publish` only hands the version to the registry — the metadata is visible but the **tarball is not public, so nobody can install it** until a maintainer approves with 2FA (`npm stage list dsh-map-tools` → `npm stage approve <stage-id>`, or the Staged Packages tab on npmjs.com). This repo has no CI yet, so `--stage` is the **local equivalent of dsh-jev-tools' CI flow** (a trusted publisher configured stage-only).
-- **"Published" is not "installable"**: the full packument, the corgi packument used by installs, and the tarball propagate as three independent caches (plus npm's own local HTTP cache). The script therefore has exactly one criterion: fetch the tarball with a **fresh cache and `--prefer-online`**, and compare its sha1 with the local build. The website's Published badge and `npm view` both propagate earlier than the tarball, so neither counts as evidence.
+Without CI, or to publish by hand, the same moves are available locally:
+
+```sh
+node scripts/publish.mjs                  # direct: build → test → pack check → publish → verify installability
+node scripts/publish.mjs --stage          # two-step: stage only, then approve with 2FA
+node scripts/publish.mjs --verify-only    # verify one version is genuinely installable (sha1 compared)
+```
+
+Both paths judge "published" by one criterion: **fetch the tarball with a fresh cache and `--prefer-online`**, and compare its sha1 with the local build. npm's read path is several independently propagated caches (full packument, the corgi packument installs use, and the tarball) — **the website's `Published` badge and `npm view` both propagate earlier than the tarball and are not evidence of installability**.
 
 Versioning follows [SemVer](https://semver.org/); changes are tracked in [CHANGELOG.md](CHANGELOG.md). The published package contains only `lib/`, `client/`, `cordis.patch.yml` and `LICENSE` (plus the `package.json` / READMEs npm always ships).
 

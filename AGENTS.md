@@ -64,6 +64,8 @@ pnpm hooks         # 安装 pre-commit secret guard（开发者手动；见"不�
 pnpm run build     # tsc → lib/（必须通过）
 pnpm test          # vitest 单元测试（必须全绿）
 node scripts/smoke.mjs   # 7 工具注册检查
+node scripts/check-tarball.mjs   # 发布包不含本地状态、也不缺消费者需要的文件
+node scripts/check-runtime.mjs   # 构建产物能在声明的最低 Node 上加载（需先 build）
 ```
 
 - 单元测试用 `vi.stubGlobal('fetch', ...)` mock 网络，**不要**在 tests/ 里发真实请求。
@@ -80,13 +82,17 @@ node scripts/smoke.mjs   # 7 工具注册检查
 
 ## 发布流程
 
+发版走 CI（`.github/workflows/release.yml`），而且是**两段式**：
+
 1. 更新 `CHANGELOG.md`（版本号 + 变更分类 Added/Fixed/Changed/Removed）。
-2. 按 SemVer 提升 `package.json` 版本。
+2. 按 SemVer 提升 `package.json` 版本（tag 与 `package.json` 必须一致，CI 会拦）。
 3. `pnpm run build && pnpm test` 全绿。
-4. `node scripts/publish.mjs`（需 npm 已登录）。脚本自己跑构建 + 测试 + 打包检查闸门，发布后**用全新缓存 + `--prefer-online` 把 tarball 真拉下来**、并与本地构建产物对照 sha1 才算成功——网站上的 `Published` 和 `npm view` 都比 tarball 传播得早，**不能**当"能装上"的判据。
-   - 两段式发布（对齐 dsh-jev-tools CI 的 stage-only 模型，npm ≥ 11.15.0）：`node scripts/publish.mjs --stage`，然后由维护者用 2FA 批准 —— `npm stage list dsh-map-tools` → `npm stage approve <stage-id>`，或 npmjs.com 的 Staged Packages 页。
-   - 批准后/事后核对：`node scripts/publish.mjs --verify-only`。
-5. 推送 git + 打 tag（可选但推荐）。
+4. `git tag -a vX.Y.Z && git push origin vX.Y.Z`：CI 跑闸门（build / test / smoke / check-tarball）后执行 `npm stage publish`，**只 staging**（此时谁都装不到），并留下一个**草稿** Release。
+5. 维护者用 2FA 批准：`npm stage list dsh-map-tools` → `npm stage approve <stage-id>`（或 npmjs.com → Staged Packages），再 `gh release edit vX.Y.Z --draft=false` 把草稿转正。CI 的 run summary 会打印这三条命令。
+6. 手动/无 CI 时的等价物：`node scripts/publish.mjs`（直发）/ `--stage`（两段式）/ `--verify-only`（事后核对可安装性）。
+
+- 一次性配置：npm 包的 Trusted publishing 需要一条 GitHub Actions 连接（repository `dsh-map-tools`、workflow `release.yml`、**`allowed actions` 不勾 `npm publish`**），见 `release.yml` 顶部注释。
+- "发布成功"的判据只有一条：**全新缓存 + `--prefer-online` 真能拉到 tarball**（并与本地构建产物对照 sha1）。网站上的 `Published` 和 `npm view` 都比 tarball 传播得早，**不能**当"能装上"的判据。
 
 ## 提交信息规范
 

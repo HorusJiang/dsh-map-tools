@@ -1,24 +1,95 @@
 name: CI
 
+# Every push to master and every pull request, on both platforms this plugin
+# claims to support. Windows is not decoration here: the plugin is developed on
+# it, and a suite that only ever ran on Linux is evidence about Linux.
+#
+# `release.yml` runs the same gates before staging a package, so nothing that CI
+# would reject can reach npm.
 on:
   push:
     branches: [master]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }} · node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # A red run on one platform must not hide the other's result: "it works" is
+      # only true when both ran.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22']
     steps:
       - uses: actions/checkout@v4
+
+      # pnpm first: setup-node's `cache: pnpm` needs the store path it defines.
       - uses: pnpm/action-setup@v4
         with:
           version: 11
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
+      # `--frozen-lockfile` requires the lockfile to match package.json, which is a
+      # check in its own right: a dependency edited without regenerating the lock
+      # fails here rather than after a publish.
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
       - name: Build
         run: pnpm run build
+
       - name: Unit tests
         run: pnpm test
+
+      - name: The 7 tools still register
+        run: node scripts/smoke.mjs
+
+      - name: The browser half parses
+        run: node --check client/client.js
+
+      # The publish path runs this too; running it on every push means a change that
+      # would ship local state is caught long before a tag exists.
+      - name: The tarball carries nothing local
+        run: node scripts/check-tarball.mjs
+
+  # `engines` promises Node 20, and only the *artifact* can be checked there: the
+  # suite is TypeScript run by vitest, so "the tests passed on 22" says nothing about
+  # what a Node 20 consumer loads. The two claims are verified separately — the suite
+  # on 22 above, the shipped files here.
+  runtime-floor:
+    name: node 20 · the built artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm run build
+
+      # Switch to the floor version only after the toolchain has done its work:
+      # pnpm 11 is not guaranteed to run on Node 20, and this job is about the
+      # artifact, not about pnpm.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: The built entry loads on the declared floor
+        run: node scripts/check-runtime.mjs

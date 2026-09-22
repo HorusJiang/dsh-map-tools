@@ -1,0 +1,157 @@
+name: release
+
+# Releasing is two steps, and the second one is a human.
+#
+#   1. `git tag -a vX.Y.Z && git push origin vX.Y.Z` — this workflow runs the same
+#      gates CI runs, then **stages** the package with `npm stage publish`.
+#      Nothing is public yet.
+#   2. A maintainer approves the staged version with 2FA — `npm stage approve
+#      <stage-id>`, or the Staged Packages tab on npmjs.com — and then publishes
+#      the draft Release this workflow left behind:
+#          gh release edit vX.Y.Z --draft=false
+#      Both commands are printed in the run summary, so the run itself says what is
+#      left to do.
+#
+# Why it is two steps: the trusted publisher is configured **stage-only** —
+# `npm publish` is not among its allowed actions — so a compromised workflow cannot
+# put a package in front of the world on its own. The tag says "this is a release
+# candidate"; the 2FA prompt is what says "and this is a release".
+#
+# A tag is still the only thing that triggers this. There is deliberately no
+# `workflow_dispatch`: `npm stage publish` uploads whatever package.json says, so a
+# manual trigger would be a path to staging a version nobody tagged, and the version
+# check below closes that by construction rather than by remembering.
+#
+# ## One-time setup, on the npm side
+#
+# Package settings -> Trusted publishing -> Add trusted publisher -> GitHub Actions:
+#
+#   organization or user : HorusJiang
+#   repository           : dsh-map-tools
+#   workflow filename    : release.yml     (filename only, no path)
+#   environment          : (leave empty)
+#   allowed actions      : leave `npm publish` UNCHECKED — staged publishing only
+#
+# Two more prerequisites from npm's own docs: the package must already exist on the
+# registry (dsh-map-tools does), and **2FA must be enabled on the account** —
+# approval, by CLI or on the website, is a proof-of-presence step and cannot be done
+# without it.
+#
+# A connection's provider and required fields cannot be edited after it is created,
+# so a wrong value means deleting the connection and adding it again.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write # the OIDC token npm exchanges for a staging grant
+
+jobs:
+  stage:
+    name: stage on npm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # pnpm first: setup-node's `cache: pnpm` needs the store path it defines.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: pnpm
+
+      # Staged publishing needs npm >= 11.15.0, pinned rather than `@latest`:
+      # `@latest` installs npm 12, whose engines do not match this runner's Node —
+      # a release path that depends on someone else's release schedule.
+      - name: Ensure npm can stage with trusted publishing
+        run: npm install --global 'npm@^11.15.0'
+
+      # The tag and the manifest must agree before anything is uploaded, because the
+      # publish takes the version from package.json and ignores the tag.
+      - name: The tag and the manifest must agree
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag = ${GITHUB_REF_NAME}, package.json = ${pkg}"
+          if [ "${tag}" != "${pkg}" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${pkg}"
+            exit 1
+          fi
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The same gates CI runs, so only something those gates already passed can be
+      # staged.
+      - name: Build and test
+        run: pnpm run build && pnpm test
+
+      - name: The 7 tools still register
+        run: node scripts/smoke.mjs
+
+      - name: The tarball carries nothing local
+        run: node scripts/check-tarball.mjs
+
+      # No token and no `--provenance` flag: npm takes the OIDC identity for the
+      # grant and attaches provenance itself for a public package. Note that staging
+      # does *not* need 2FA — only approving the staged package does.
+      - name: Stage on npm
+        run: npm stage publish
+
+      - name: What is left to do
+        shell: bash
+        run: |
+          {
+            echo "### Staged \`${GITHUB_REF_NAME}\` — nothing is public yet"
+            echo
+            echo "Approve it with 2FA, then publish the draft Release:"
+            echo
+            echo '```bash'
+            echo "# find the <stage-id> (needs npm >= 11.15.0 locally)"
+            echo "npm stage list dsh-map-tools"
+            echo "# prompts for 2FA; npmjs.com -> Staged Packages works too"
+            echo "npm stage approve <stage-id>"
+            echo "gh release edit ${GITHUB_REF_NAME} --draft=false"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # A separate job with its own permissions on purpose: creating a Release writes to
+  # the repository, and the job that exchanges an OIDC token for a staging grant
+  # should not also be able to write to it. Least privilege per job, not per workflow.
+  #
+  # The Release is a **draft**, because at this point the package is staged and not
+  # public: an announcement that goes out before the thing it announces is the one
+  # mistake this whole flow exists to make impossible. Step 2 above publishes it.
+  release:
+    name: draft GitHub Release
+    needs: stage
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # The body is the changelog section for this version. The script exits
+      # non-zero when the section is missing, which is the point: an empty release is
+      # worse than a red workflow, since nobody sees it fail.
+      - name: Draft the Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node scripts/release-notes.mjs "${GITHUB_REF_NAME#v}" > release-notes.md
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --draft \
+            --notes-file release-notes.md
