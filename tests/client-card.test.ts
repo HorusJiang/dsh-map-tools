@@ -7,10 +7,45 @@
  */
 
 import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 
-/** factory 里 require 到的模块（渲染时才用，本测试只测纯函数）。 */
+/** factory 里 require 到的模块：卡片挂载会 require React，其余一律不许出现。 */
+const fakeReact = {
+  createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children }),
+  useState: (initial: unknown) => [initial, () => {}] as const,
+  useCallback: (fn: unknown) => fn,
+  useEffect: () => {},
+}
+
 const requireStub = (spec: string): unknown => {
+  if (spec === 'react') return fakeReact
   throw new Error(`unexpected require: ${spec}`)
+}
+
+/** 配置卡片的纯函数与注册入口（客户端槽位契约）。 */
+interface CardInternals {
+  ConfigCard: (react: unknown) => (props: unknown) => { type: string; children: unknown[] }
+  registerCard: (ctx: unknown) => void
+  registerOne: (scope: unknown, card: unknown, seat: { seat: string; options: Record<string, unknown> }) => void
+  BUNDLE_SEAT: string
+  LEGACY_SEAT: string
+  BUNDLE: string
+  CONFIG_URL: string
+  DEFAULT_TIMEOUT_MS: number
+  TIMEOUT_MIN_MS: number
+  TIMEOUT_MAX_MS: number
+  parseTimeout: (text: unknown) => number | null
+  effectiveConfig: (summary: unknown) => {
+    provider: string
+    hasAmapKey: boolean
+    timeoutMs: number
+    configPath: string
+  }
+  draftFrom: (summary: unknown) => { provider: string; amapKey: string; timeoutMs: string }
+  draftValid: (draft: unknown) => boolean
+  configPatch: (draft: unknown, summary: unknown) => Record<string, unknown>
+  isDirty: (draft: unknown, summary: unknown) => boolean
+  statusLine: (summary: unknown) => string
 }
 
 interface RouteInternals {
@@ -83,6 +118,7 @@ interface RouteInternals {
 }
 
 let route: RouteInternals
+let card: CardInternals
 
 beforeAll(async () => {
   const loaded: Array<{ id: string; factory: (require: (spec: string) => unknown) => Record<string, unknown> }> = []
@@ -99,6 +135,8 @@ beforeAll(async () => {
   const exportsObj = loaded[0]!.factory(requireStub)
   route = (exportsObj as { __route: RouteInternals }).__route
   expect(route).toBeTruthy()
+  card = (exportsObj as { __card: CardInternals }).__card
+  expect(card).toBeTruthy()
 })
 
 describe('routeMeta（窄化持久化元数据）', () => {
@@ -712,5 +750,271 @@ describe('回合尾部（最终结果处）的路线卡片', () => {
     expect(def.match({ type: 'assistant/message', data: {} })).toBeNull()
     expect(def.match(null)).toBeNull()
     expect(def.match({ type: 'turn/start', data: { turn: 7 } })).toEqual({ id: '7', role: 'start' })
+  })
+})
+
+describe('bundle 配置卡片（plugins.bundle.config）', () => {
+  /**
+   * 复刻宿主 slots 服务的最小假实现：`inject` 只对**已声明**的槽位触发工厂
+   * （真实语义），注册失败发生在写入账本之前。
+   */
+  function fakeCtx(options: { declared?: string[]; failRegister?: boolean } = {}) {
+    const declared = options.declared ?? ['plugins.bundle.config', 'settings.plugin.item']
+    const injected: string[] = []
+    const registered: Array<{ name: string; options: Record<string, unknown>; component: unknown }> = []
+    const slots = {
+      inject: (name: string, factory: () => unknown) => {
+        if (!declared.includes(name)) return () => {}
+        injected.push(name)
+        factory()
+        return () => {}
+      },
+      register: (opts: Record<string, unknown>, component: unknown) => {
+        if (options.failRegister === true) throw new Error('slot exploded')
+        registered.push({ name: String(opts.name), options: opts, component })
+        return () => {}
+      },
+    }
+    const ctx = {
+      inject: (deps: string[], callback: (scope: unknown) => void) => {
+        expect(deps).toEqual(['slots'])
+        callback({ slots })
+      },
+    }
+    return { ctx, injected, registered }
+  }
+
+  it('注册进 plugins.bundle.config：key = 包名，不掺 list 槽位的 id/order', () => {
+    const host = fakeCtx()
+    card.registerCard(host.ctx)
+    expect(host.injected).toEqual([card.BUNDLE_SEAT, card.LEGACY_SEAT])
+    const bundle = host.registered.find((entry) => entry.name === card.BUNDLE_SEAT)!
+    expect(bundle.options.key).toBe('dsh-map-tools')
+    // keyed 槽位只认 key：多带 id/order 会被宿主当成另一种座位的注册。
+    expect(bundle.options.id).toBeUndefined()
+    expect(bundle.options.order).toBeUndefined()
+    expect(typeof bundle.component).toBe('function')
+  })
+
+  it('老宿主（不声明 bundle 座位）仍注册设置页列表座位：id + key + order', () => {
+    const host = fakeCtx({ declared: [card.LEGACY_SEAT] })
+    card.registerCard(host.ctx)
+    expect(host.injected).toEqual([card.LEGACY_SEAT])
+    expect(host.registered).toHaveLength(1)
+    expect(host.registered[0]!.options.id).toBe('map-tools')
+    expect(host.registered[0]!.options.key).toBe('dsh-map-tools')
+    expect(host.registered[0]!.options.order).toBe(25)
+  })
+
+  it('注册失败只记日志：工厂由框架稍后调用，异常不能抛回宿主', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const host = fakeCtx({ failRegister: true })
+      expect(() => card.registerCard(host.ctx)).not.toThrow()
+      expect(host.registered).toHaveLength(0)
+      expect(errors).toHaveBeenCalled()
+    } finally {
+      errors.mockRestore()
+    }
+  })
+
+  it('没有 slots / inject 服务时静默跳过（不让插件整体失败）', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(() => card.registerCard({})).not.toThrow()
+      expect(() => card.registerCard(null)).not.toThrow()
+      expect(() => card.registerCard({ inject: (_deps: string[], cb: (scope: unknown) => void) => cb({}) })).not.toThrow()
+      expect(() => card.registerOne({}, () => null, { seat: card.BUNDLE_SEAT, options: {} })).not.toThrow()
+    } finally {
+      errors.mockRestore()
+    }
+  })
+
+  it('view 分派：老座位的 summary 给一行状态；页面未加载完不渲染任何输入控件', () => {
+    const Card = card.ConfigCard(fakeReact)
+    const summary = Card({ view: 'summary' })
+    expect(summary.type).toBe('span')
+    expect(String(summary.children.join(''))).toContain('读取中')
+    // page：读到宿主的值之前只显示一行说明，绝不先摆出填了也存不下的输入框。
+    const page = Card({ view: 'page' })
+    expect(page.type).toBe('p')
+    expect(String(page.children.join(''))).toContain('读取配置中')
+  })
+
+  it('parseTimeout：只接受区间内的整数毫秒，绝不把非法草稿改写成默认值', () => {
+    expect(card.parseTimeout('15000')).toBe(15000)
+    expect(card.parseTimeout(15000)).toBe(15000)
+    expect(card.parseTimeout(' 800 ')).toBe(800)
+    for (const bad of ['', 'abc', '15s', '12.5', '0', '-100', '99', '600001', null, undefined, Number.NaN]) {
+      expect(card.parseTimeout(bad)).toBeNull()
+    }
+  })
+
+  it('effectiveConfig：缺省补齐成 schema 默认（provider=amap、超时=15000）', () => {
+    expect(card.effectiveConfig(null)).toEqual({
+      provider: 'amap',
+      hasAmapKey: false,
+      timeoutMs: card.DEFAULT_TIMEOUT_MS,
+      configPath: '',
+    })
+    expect(card.effectiveConfig({ provider: 'osm', hasAmapKey: true, timeoutMs: 800, configPath: 'C:/x/config.json' }))
+      .toEqual({ provider: 'osm', hasAmapKey: true, timeoutMs: 800, configPath: 'C:/x/config.json' })
+    // 文件里写坏的超时退成默认，而不是把 NaN 带进表单。
+    expect(card.effectiveConfig({ timeoutMs: 'x' }).timeoutMs).toBe(card.DEFAULT_TIMEOUT_MS)
+  })
+
+  it('draftFrom：key 输入框每次播种都是空的（路由不回显，空着就不写）', () => {
+    expect(card.draftFrom({ provider: 'amap', hasAmapKey: true, timeoutMs: 8000 }))
+      .toEqual({ provider: 'amap', amapKey: '', timeoutMs: '8000' })
+  })
+
+  it('configPatch：只发改动过的字段；空 patch 让保存幂等', () => {
+    const summary = { provider: 'amap', hasAmapKey: true, timeoutMs: 15000 }
+    expect(card.configPatch(card.draftFrom(summary), summary)).toEqual({})
+    expect(card.isDirty(card.draftFrom(summary), summary)).toBe(false)
+    expect(card.configPatch({ provider: 'osm', amapKey: '', timeoutMs: '15000' }, summary)).toEqual({ provider: 'osm' })
+    expect(card.configPatch({ provider: 'amap', amapKey: 'k', timeoutMs: '8000' }, summary))
+      .toEqual({ amapKey: 'k', timeoutMs: 8000 })
+    // 非法超时不进 patch：保存被阻止，而不是把垃圾写下去。
+    expect(card.configPatch({ provider: 'amap', amapKey: '', timeoutMs: 'abc' }, summary)).toEqual({})
+    expect(card.draftValid({ provider: 'amap', amapKey: '', timeoutMs: 'abc' })).toBe(false)
+    expect(card.draftValid({ provider: 'amap', amapKey: '', timeoutMs: '15000' })).toBe(true)
+    expect(card.draftValid({ provider: 'baidu', amapKey: '', timeoutMs: '15000' })).toBe(false)
+    expect(card.draftValid(null)).toBe(false)
+  })
+
+  it('statusLine：页面的状态行与老座位的一行简介共用同一句', () => {
+    expect(card.statusLine(null)).toBe('读取中…')
+    expect(card.statusLine({ provider: 'amap', hasAmapKey: true })).toContain('已配置 key')
+    expect(card.statusLine({ provider: 'amap', hasAmapKey: false })).toContain('未配置 key')
+    expect(card.statusLine({ provider: 'osm' })).toContain('免费 OSM')
+  })
+
+  /**
+   * 极简 React 替身：state 落在可复用的单元格里、effect 由调用方显式跑。
+   * 这样组件的**整条渲染路径**（不只是纯函数）都能被断言，免得 ready 分支里
+   * 的引用错误只能等浏览器报错。
+   */
+  function harness() {
+    type Node = { type: unknown; props: Record<string, unknown>; children: Node[] }
+    const cells: unknown[] = []
+    const effects: Array<() => void> = []
+    let cursor = 0
+    const react = {
+      createElement: (type: unknown, props: unknown, ...children: Node[]) => ({ type, props: (props ?? {}) as Record<string, unknown>, children }),
+      useState: (initial: unknown) => {
+        const at = cursor
+        cursor += 1
+        if (at >= cells.length) cells.push(initial)
+        return [cells[at], (next: unknown) => {
+          cells[at] = typeof next === 'function' ? (next as (previous: unknown) => unknown)(cells[at]) : next
+        }]
+      },
+      useCallback: (fn: unknown) => fn,
+      useEffect: (fn: () => void) => { effects.push(fn) },
+    }
+    const Card = card.ConfigCard(react)
+    /** 每次渲染重置 hook 游标（单元格留着，所以状态跨渲染保留）。 */
+    const render = (props: unknown): Node => {
+      cursor = 0
+      return Card(props) as Node
+    }
+    const runEffects = (): void => {
+      for (const fn of effects.splice(0)) fn()
+    }
+    return { render, runEffects }
+  }
+
+  /** 按文字找按钮。 */
+  function findButton(node: unknown, label: string): { props: Record<string, unknown> } | undefined {
+    if (node === null || typeof node !== 'object') return undefined
+    const element = node as { type?: unknown; props?: Record<string, unknown>; children?: unknown[] }
+    if (element.type === 'button') {
+      const text = (element.children ?? []).filter((child) => typeof child === 'string').join('')
+      if (text === label) return { props: element.props ?? {} }
+    }
+    for (const child of element.children ?? []) {
+      const found = findButton(child, label)
+      if (found !== undefined) return found
+    }
+    return undefined
+  }
+
+  it('page：加载完成后渲染三段表单，未改动时保存按钮禁用（点它不该写盘）', async () => {
+    const summary = { provider: 'amap', hasAmapKey: true, timeoutMs: 8000, configPath: 'C:/x/config.json' }
+    const fetchStub = vi.fn(() => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(summary),
+    }))
+    vi.stubGlobal('fetch', fetchStub)
+    try {
+      const view = harness()
+      const loading = view.render({ view: 'page' })
+      expect(loading.type).toBe('p')
+      view.runEffects()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const page = view.render({ view: 'page' })
+
+      expect(fetchStub).toHaveBeenCalledWith(card.CONFIG_URL, expect.anything())
+      const text = JSON.stringify(page)
+      expect(text).toContain('高德 · 已配置 key')
+      expect(text).toContain('数据源')
+      expect(text).toContain('高德 key（Web 服务）')
+      expect(text).toContain('超时（毫秒）')
+      expect(text).toContain('打开配置文件')
+      expect(text).toContain('C:/x/config.json')
+      // 没有改动 → 保存不可点（保存是显式动作，不是随打字落盘）。
+      expect(findButton(page, '保存')?.props.disabled).toBe(true)
+      expect(findButton(page, '保存中…')).toBeUndefined()
+      // key 输入框每次加载都是空的：路由不回显，空着就不写。
+      const keyInput = JSON.stringify(page)
+      expect(keyInput).toContain('"value":""')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('page：宿主路由不可用时把控件换成说明，而不是一排存不下的输入框', async () => {
+    const fetchStub = vi.fn(() => Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) }))
+    vi.stubGlobal('fetch', fetchStub)
+    try {
+      const view = harness()
+      view.render({ view: 'page' })
+      view.runEffects()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const page = view.render({ view: 'page' })
+      const text = JSON.stringify(page)
+      expect(text).toContain('不可用')
+      expect(text).not.toContain('数据源')
+      expect(findButton(page, '保存')).toBeUndefined()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('配置卡片只引用运行中真实存在的主题 token', () => {
+    // 手写变量名是本项目踩过的坑：名字不存在时 fallback 会静默生效，深浅色就不跟随了。
+    // 想在本区间引入新 token，先在这里登记（这一组按 ui-theme 的 design-platform.css 核对过）。
+    const verified = [
+      '--dsw-alias-bg-layer-3',
+      '--dsw-alias-border-l2',
+      '--dsw-alias-border-l4',
+      '--dsw-alias-brand-primary',
+      '--dsw-alias-button-primary-fill',
+      '--dsw-alias-label-primary',
+      '--dsw-alias-label-primary-foreground',
+      '--dsw-alias-label-secondary',
+      '--dsw-alias-label-tertiary',
+      '--dsw-alias-state-error-primary',
+      '--dsw-alias-state-success-primary',
+    ]
+    const source = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8')
+    const start = source.indexOf('function ConfigCard(')
+    const end = source.indexOf('// ---- 路线卡片')
+    expect(start).toBeGreaterThan(-1)
+    expect(end).toBeGreaterThan(start)
+    const used = [...source.slice(start, end).matchAll(/var\((--dsw-[a-z0-9-]+)/g)].map((match) => match[1]!)
+    expect([...new Set(used)].sort()).toEqual(verified)
   })
 })

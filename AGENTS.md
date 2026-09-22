@@ -10,7 +10,7 @@ src/
   config.ts         # Schemastery 配置 schema + 申请链接常量
   config-file.ts    # ~/.dsh-map-tools/config.json 读写（0600）
   config-route.ts   # 回环路由 /dsh-map-tools/config（同源校验）
-  settings-ns.ts    # 设置页 namespace 注册
+  settings-ns.ts    # 老宿主设置页 namespace 注册（新宿主走 bundle 座位）
   clients/          # 数据源客户端
     amap.ts         #   高德 Web 服务 API（推荐数据源）
     osrm.ts         #   OSRM 免费路线（兜底）
@@ -21,7 +21,7 @@ src/
     geocode.ts      #   map_geocode / map_reverse_geocode
     poi.ts          #   map_poi_search
   types.ts          # 共享类型（LngLat / RouteResult / GeocodeResult 等）
-client/client.js    # 设置页配置卡片（手写 lazy-CJS bundle，零构建零依赖）
+client/client.js    # bundle 配置页 + 路线卡片（手写 lazy-CJS bundle，零构建零依赖）
 tests/              # vitest 单元测试（mock fetch，不碰真实网络）
 scripts/            # smoke / integration / amap-e2e / config-e2e / publish
 ```
@@ -49,9 +49,12 @@ scripts/            # smoke / integration / amap-e2e / config-e2e / publish
 
 ### client 卡片
 
-- `client/client.js` 是**手写 lazy-CJS bundle**（`window.__ModuleLoader__.load`），零构建、零依赖（只 require react + ui-primitives）。
-- 修改后必须 `node --check client/client.js` 验证语法。
+- `client/client.js` 是**手写 lazy-CJS bundle**（`window.__ModuleLoader__.load`），零构建、零依赖：**只 require `react`**。不要再 require `@deepseek-ai/dsh-client-ui-primitives` 之类的客户端包——运行中的宿主模块表未必有它，`require` 抛错会把整张卡带走。
+- 配置卡注册在 **`plugins.bundle.config`**（keyed，key = 包名 `dsh-map-tools`，宿主画标题/描述/开关，插件只画内容）；**老宿主**（DSH ≤ 0.1.5，没有这个座位）回落到 `settings.plugin.item`（list，`id` + `key` + `order`）。两条注册都要留：`slots.inject` 只对宿主**已声明**的座位触发工厂，所以这是能力探测，不是版本判断。
 - 卡片数据走 `/dsh-map-tools/config` 回环路由，**不直接写 DSH 设置**。
+- 主题变量只用 `--dsw-alias-*` 里**真实存在**的名字（对照 `ui-theme` 的 `design-platform.css` 或运行时 token 表）。不存在的名字会静默落到 fallback、深浅色不跟随——`--dsw-alias-accent` / `--dsw-alias-border` / `--dsw-alias-bg-elevated` 就是踩过的三个。`tests/client-card.test.ts` 里有一张登记表守着这条。
+- 卡片是**暂存 + 显式保存**：离开页面丢弃暂存（所以没有「取消」按钮）、非法草稿**拦住**保存而不是被改写、只发改动过的字段、保存后**从宿主回读**再播种（key 输入框随之回到空白）。
+- 修改后必须 `node --check client/client.js` 验证语法。
 
 ## 开发流程
 
@@ -72,6 +75,7 @@ node scripts/smoke.mjs   # 7 工具注册检查
 
 - 任何面向模型的工具变更必须补充/更新对应单元测试。
 - 修改配置文件读写必须更新 `tests/config-file.test.ts`。
+- 修改 `client/client.js` 必须更新 `tests/client-card.test.ts`（该文件直接加载随包发布的 client.js，跑的就是浏览器那份字节）。
 - 提交前确认：`build` 绿、`test` 全绿、`smoke` 绿。
 
 ## 发布流程

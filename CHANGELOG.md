@@ -2,6 +2,48 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.0] - 2026-09-20
+
+### Changed
+
+- **配置卡片搬到侧边栏「插件」页的 bundle 卡**。DSH 0.1.6-alpha.2 起，设置页的
+  `settings.plugin.item` 座位已不再声明（运行时插槽树实测 `available: false`），
+  第三方 bundle 的配置页应该占宿主为它留的 **`plugins.bundle.config`**
+  （keyed，key = 包名 `dsh-map-tools`；宿主自己画标题、包名、描述、开关与卸载按钮，
+  插件只画内容；只被请求 `view: 'page'`）。老宿主（DSH ≤ 0.1.5）没有这个座位，
+  卡片自动回落到 `settings.plugin.item`——两条注册都留着，靠 `slots.inject`
+  只对**已声明**座位触发工厂来做能力探测，不写死版本号。配置数据一行没变：
+  仍走 `/dsh-map-tools/config` 回环路由读写 `~/.dsh-map-tools/config.json`。
+- 卡片形态对齐官方配置页（不再是一张可折叠的深色标题条）：顶部状态行 + 数据源 /
+  key / 超时三段表单 + 底部操作条；控件与按钮改用运行时**真实存在**的
+  `--dsw-alias-*` 令牌与胶囊按钮几何。卡片不再 require
+  `@deepseek-ai/dsh-client-ui-primitives`（零依赖，只 require `react`），
+  避免宿主模块表没有该包时连卡片一起挂。
+- 保存语义按座位契约收紧：**只暂存、点保存才落盘**，离开页面即丢弃（因此移除了
+  「放弃」按钮）；超时非法值**拦住保存**并在原地提示，不再被 `Number(x) || 15000`
+  悄悄改写成默认值；非法值也不进请求体，改动为空直接跳过写入（保存幂等）。
+- 保存成功后**从宿主返回的值重新播种**（宿主是"写没写进去"的唯一权威），key
+  输入框随之回到空白——此前它会把刚输入的 key 留在浏览器状态里。
+- 回环路由原本就有、卡片一直没用上的 `GET /dsh-map-tools/config?open=true`
+  现在接到了「打开配置文件」按钮上。
+
+### Fixed
+
+- **手写主题变量名。** 卡片引用了 3 个本 harness 并不存在的别名
+  （`--dsw-alias-accent`、`--dsw-alias-border`、`--dsw-alias-bg-elevated`），
+  它们全部静默落到硬编码 fallback，深浅色下颜色不跟随主题；现在只使用
+  `ui-theme` 的 `design-platform.css` 里真实定义的名字，并在
+  `tests/client-card.test.ts` 里留了一张登记表守着（新增 token 必须先登记）。
+- 宿主回环路由不可用时（插件宿主半没加载）不再渲染一排填了也存不下的输入框，
+  改为原地说明原因并给出配置文件路径。
+
+### Added
+
+- `tests/client-card.test.ts` 增加配置卡片用例：两个座位的注册形状
+  （bundle 座位只要 `key`；老座位要 `id` + `key` + `order`）、注册失败的兜错、
+  `summary` / `page` 两种视图的分派，以及 `parseTimeout` / `effectiveConfig` /
+  `draftFrom` / `draftValid` / `configPatch` / `isDirty` / `statusLine` 的纯函数行为。
+
 ## [0.6.1] - 2026-09-18
 
 ### Fixed

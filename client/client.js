@@ -1,12 +1,37 @@
 /**
- * dsh-map-tools browser half: the 设置 → 插件 configuration card.
+ * dsh-map-tools browser half: the bundle's own configuration card.
  *
- * Hand-written lazy-CJS bundle (window.__ModuleLoader__.load), zero build
- * step, zero imports from dsh client packages beyond react + ui-primitives —
- * the same stance as the modlens client half. Data flows through the host
- * loopback route /dsh-map-tools/config, never through the DSH settings
- * document: keys are stored in ~/.dsh-map-tools/config.json and never echoed
- * back to the card (only hasAmapKey boolean).
+ * Hand-written lazy-CJS bundle (`window.__ModuleLoader__.load`), no build step,
+ * and no imports beyond React. Requiring a `@deepseek-ai/dsh-*` client package
+ * would couple this card to a signature that may be absent from the running
+ * harness's module table — the sibling dsh-jev-tools card takes the same stance,
+ * and a `require` that throws at mount time takes the whole card down with it.
+ *
+ * **Where it renders.** `plugins.bundle.config`, the seat the sidebar 插件 page
+ * declares for a bundle's own configuration. That page keys the seat by the
+ * bundle's **package name**, draws the title, the package name, the description,
+ * the crumb and the uninstall/switch controls itself, and asks the card only for
+ * `view: 'page'` (verified against the running 0.1.6-alpha.2 harness:
+ * `ui-plugin-manager` renders
+ * `renderSlot('plugins.bundle.config', { view: 'page' }, { entryKey: pkg.name })`).
+ * Harnesses older than 0.1.6-alpha.2 declare no such seat and dispatch the
+ * settings page's `settings.plugin.item` list seat instead (`summary`, then
+ * `page`); that is why the component still answers `summary`, and why both seats
+ * are registered. `slots.inject` runs its factory only for a slot the running
+ * host declares, so this is a capability probe, not a version check.
+ *
+ * **Where the data lives.** The host loopback route `/dsh-map-tools/config`,
+ * never the DSH settings document. The key lives in
+ * `~/.dsh-map-tools/config.json` (0600) and is never echoed back — the route
+ * answers `hasAmapKey: boolean` and nothing else — so the input starts blank on
+ * every load and a blank left untouched is never written.
+ *
+ * **How it saves.** Staged edits, one explicit save. Leaving the page discards
+ * the draft (the component's state dies with it), so there is no 取消 control;
+ * an invalid draft blocks the save instead of being silently repaired; only
+ * changed fields ride the request; and after a save the form re-seeds from what
+ * the host accepted, because the host is the only authority on whether a write
+ * landed.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-map-tools',
@@ -14,190 +39,441 @@ window.__ModuleLoader__.load({
     var module = { exports: {} }
     var exports = module.exports
 
-    /** Whether the host route is mounted (a 404 or network failure = absent). */
-    function hostRoutePresent() {
-      return fetch('/dsh-map-tools/config').then((response) => {
-        if (response.status === 404) return false
-        return response.ok || response.status === 405 || response.status === 200
-      }).catch(() => false)
+    /** The bundle's package name: the key the Plugins page dispatches this seat by. */
+    var BUNDLE = 'dsh-map-tools'
+    /** The Plugins page's seat for a bundle's own configuration (keyed by package name). */
+    var BUNDLE_SEAT = 'plugins.bundle.config'
+    /** Pre-0.1.6 seat: the settings page's plugin list (list kind, `key` = settings namespace). */
+    var LEGACY_SEAT = 'settings.plugin.item'
+    /** The host loopback route this card reads and writes. */
+    var CONFIG_URL = '/dsh-map-tools/config'
+    /** Where a user creates an Amap (高德) Web service key — mirrors src/config.ts. */
+    var AMAP_URL = 'https://console.amap.com/dev/key/app'
+    /** The composition schema's default timeout; the route omits the field while unset. */
+    var DEFAULT_TIMEOUT_MS = 15000
+    /** Accepted timeout range (ms): below it every upstream call aborts, above it a typo hides. */
+    var TIMEOUT_MIN_MS = 100
+    var TIMEOUT_MAX_MS = 600000
+    var PROVIDERS = [
+      { id: 'amap', label: '高德地图（推荐，公交/POI/中文地址都靠它）' },
+      { id: 'osm', label: '免费 OSM（无需 key，能力有限）' },
+    ]
+
+    /**
+     * The staged timeout as a number, or null while it is not a usable value.
+     *
+     * Nothing here coerces a bad draft into a default: silently rewriting `abc`
+     * to 15000 would save a value the user never typed.
+     *
+     * @param text - the staged input text.
+     * @returns milliseconds, or null when the text is not a value a save may write.
+     */
+    function parseTimeout(text) {
+      var value = String(text === null || text === undefined ? '' : text).trim()
+      if (!/^\d+$/.test(value)) return null
+      var parsed = Number(value)
+      if (parsed < TIMEOUT_MIN_MS || parsed > TIMEOUT_MAX_MS) return null
+      return parsed
     }
 
+    /**
+     * The effective config as the form works with it: provider and timeout always
+     * resolve, because the route omits a field the config file does not hold and
+     * the schema default applies then.
+     *
+     * @param summary - the route's non-secret summary, or null while loading.
+     * @returns the values the controls compare a draft against.
+     */
+    function effectiveConfig(summary) {
+      var s = summary === null || summary === undefined ? {} : summary
+      var timeout = parseTimeout(s.timeoutMs)
+      return {
+        provider: s.provider === 'osm' ? 'osm' : 'amap',
+        hasAmapKey: s.hasAmapKey === true,
+        timeoutMs: timeout === null ? DEFAULT_TIMEOUT_MS : timeout,
+        configPath: typeof s.configPath === 'string' ? s.configPath : '',
+      }
+    }
+
+    /**
+     * The draft a freshly accepted config seeds. The key field is always blank —
+     * the route cannot echo it, and a blank left alone is never written.
+     *
+     * @param summary - the summary the host just accepted.
+     * @returns the staged draft.
+     */
+    function draftFrom(summary) {
+      var config = effectiveConfig(summary)
+      return { provider: config.provider, amapKey: '', timeoutMs: String(config.timeoutMs) }
+    }
+
+    /**
+     * Whether the staged draft holds only values a save may write.
+     *
+     * @param draft - the staged draft.
+     * @returns true when every field is usable.
+     */
+    function draftValid(draft) {
+      if (draft === null || draft === undefined) return false
+      if (draft.provider !== 'amap' && draft.provider !== 'osm') return false
+      return parseTimeout(draft.timeoutMs) !== null
+    }
+
+    /**
+     * The patch a save would send: only fields the user actually changed, never
+     * an unusable one. An empty result means the save is a no-op, which keeps
+     * saving idempotent — clicking twice writes once.
+     *
+     * @param draft - the staged draft.
+     * @param summary - the config the host currently holds.
+     * @returns the JSON body a save would post.
+     */
+    function configPatch(draft, summary) {
+      var patch = {}
+      if (draft === null || draft === undefined) return patch
+      var config = effectiveConfig(summary)
+      if (draft.provider !== config.provider) patch.provider = draft.provider
+      if (draft.amapKey !== '') patch.amapKey = draft.amapKey
+      var timeout = parseTimeout(draft.timeoutMs)
+      if (timeout !== null && timeout !== config.timeoutMs) patch.timeoutMs = timeout
+      return patch
+    }
+
+    /**
+     * Whether the draft carries an edit the host does not already hold.
+     *
+     * @param draft - the staged draft.
+     * @param summary - the config the host currently holds.
+     * @returns true when a save would write something.
+     */
+    function isDirty(draft, summary) {
+      return Object.keys(configPatch(draft, summary)).length > 0
+    }
+
+    /**
+     * One line describing the current state: the page's status row, and the whole
+     * one-liner the legacy list seat asks a card for.
+     *
+     * @param summary - the route's summary, or null while loading.
+     * @returns the status text.
+     */
+    function statusLine(summary) {
+      if (summary === null || summary === undefined) return '读取中…'
+      var config = effectiveConfig(summary)
+      if (config.provider === 'osm') return '免费 OSM · 无需 key（公交/POI/中文地址不可用）'
+      return config.hasAmapKey ? '高德 · 已配置 key' : '高德 · 未配置 key（公交/POI/中文地址需先填 key）'
+    }
+
+    /**
+     * Register the card into every configuration seat the running host declares.
+     *
+     * @param ctx - the client plugin context.
+     */
     function registerCard(ctx) {
-      if (typeof ctx.inject !== 'function') return
-      ctx.inject(['slots'], (scope) => {
-        hostRoutePresent().then((present) => {
-          if (!present) return
-          try {
-            mountCard(scope)
-          } catch (error) {
-            console.error(`[dsh-map-tools] settings card skipped: ${error}`)
-          }
+      if (!ctx || typeof ctx.inject !== 'function') return
+      ctx.inject(['slots'], function (scope) {
+        if (!scope.slots || typeof scope.slots.inject !== 'function') return
+        var react
+        try {
+          react = require('react')
+        } catch (error) {
+          console.error(`[dsh-map-tools] config card skipped: ${error}`)
+          return
+        }
+        var Card = ConfigCard(react)
+        registerOne(scope, Card, {
+          // 0.1.6-alpha.2+: the bundle's page in the sidebar 插件 page, keyed by package name.
+          seat: BUNDLE_SEAT,
+          options: { name: BUNDLE_SEAT, key: BUNDLE },
+        })
+        registerOne(scope, Card, {
+          // Older hosts: the settings page's plugin list. `id` is required there and
+          // `key` is the settings namespace the host serves for this card.
+          seat: LEGACY_SEAT,
+          options: { name: LEGACY_SEAT, id: 'map-tools', key: BUNDLE, order: 25, label: '地图引擎 (dsh-map-tools)' },
         })
       })
     }
 
-    function mountCard(ctx) {
-      var react
+    /**
+     * Register one seat, never letting a failure escape into the host.
+     *
+     * The guard sits **inside** the factory: `slots.inject` only stores the
+     * factory and calls it later (synchronously when the slot is already declared,
+     * otherwise once the declaration arrives), so a throw from the registration
+     * would surface outside any try/catch wrapped around the `inject` call — the
+     * failures this plugin's turn-tail registration already hit.
+     *
+     * @param scope - the client context carrying `slots`.
+     * @param Card - the component to register.
+     * @param seat - the slot name and its registration options.
+     */
+    function registerOne(scope, Card, seat) {
       try {
-        react = require('react')
+        scope.slots.inject(seat.seat, function () {
+          try {
+            return scope.slots.register(seat.options, Card)
+          } catch (error) {
+            console.error(`[dsh-map-tools] config card skipped on ${seat.seat}: ${error}`)
+            return function () {}
+          }
+        })
       } catch (error) {
-        console.error(`[dsh-map-tools] settings card skipped: ${error}`)
-        return
+        console.error(`[dsh-map-tools] config card skipped on ${seat.seat}: ${error}`)
       }
-      var ui = require('@deepseek-ai/dsh-client-ui-primitives')
-      var Card = ConfigCard(react, ui)
-      ctx.slots.inject('settings.plugin.item', function* () {
-        yield ctx.slots.register({ name: 'settings.plugin.item', id: 'map-tools', key: 'dsh-map-tools', order: 25 }, Card)
-      })
     }
 
-    function ConfigCard(react, ui) {
+    /**
+     * The bundle's configuration card.
+     *
+     * The owner draws the page's title, breadcrumb and uninstall control, so this
+     * component draws only the configuration itself — in the vocabulary the
+     * shipped settings surfaces use (label / control / hint and capsule buttons),
+     * so a third-party page reads as the same product.
+     *
+     * @param react - the browser module table's React.
+     * @returns the card component.
+     */
+    function ConfigCard(react) {
       var h = react.createElement
-      var Input = ui.Input
-      var AMAP_URL = 'https://console.amap.com/dev/key/app'
-      var PROVIDERS = [
-        { id: 'amap', label: '高德地图（推荐）' },
-        { id: 'osm', label: '免费 OSM（无需 key，能力有限）' },
-      ]
 
-      function maskProps() {
-        // Hidden characters without being a password field: keeps the key out
-        // of Safari's keychain offer (same trade the modlens card makes).
-        var p = { autoComplete: 'off' }
+      // Every name below is defined by the running theme (`ui-theme`'s
+      // design-platform.css, cross-checked against the live theme token table).
+      // A name the theme does not define falls back silently and stops following
+      // light/dark — which is exactly what `--dsw-alias-accent`,
+      // `--dsw-alias-border` and `--dsw-alias-bg-elevated` did in this card's
+      // previous version. Fallbacks stay as a last resort, not as the plan.
+      var TEXT = 'var(--dsw-alias-label-primary, inherit)'
+      var MUTED = 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))'
+      var HINT = 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))'
+      var BORDER = 'var(--dsw-alias-border-l4, rgba(127,127,127,0.3))'
+      var SEPARATOR = '0.5px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.2))'
+      var ACCENT = 'var(--dsw-alias-brand-primary, #4f8cff)'
+      var ERROR = 'var(--dsw-alias-state-error-primary, #e05c5c)'
+      var OK = 'var(--dsw-alias-state-success-primary, #22a06b)'
+      var FIELD_BG = 'var(--dsw-alias-bg-layer-3, rgba(127,127,127,0.08))'
+      var PRIMARY_FILL = 'var(--dsw-alias-button-primary-fill, #4f8cff)'
+      var PRIMARY_TEXT = 'var(--dsw-alias-label-primary-foreground, #fff)'
+
+      var FIELD = { display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px 0', borderTop: SEPARATOR }
+      var FIRST_FIELD = { display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px 0' }
+      var LABEL = { fontSize: '13px', fontWeight: 500, lineHeight: 1.5, color: TEXT }
+      var CONTROL = { width: '100%', boxSizing: 'border-box', height: '34px', padding: '0 12px', border: '0.5px solid ' + BORDER, borderRadius: '8px', background: FIELD_BG, font: 'inherit', fontSize: '13px', lineHeight: 1.5, color: TEXT }
+      var HINT_STYLE = { margin: 0, fontSize: '12px', lineHeight: 1.5, color: HINT }
+      var CAPTION_STYLE = { margin: 0, fontSize: '12px', lineHeight: 1.5, color: MUTED }
+      var BUTTON = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '28px', padding: '0 12px', borderRadius: '14px', border: '0.5px solid ' + BORDER, background: 'transparent', font: 'inherit', fontSize: '12px', lineHeight: '18px', color: TEXT, cursor: 'pointer' }
+      var PRIMARY_BUTTON = Object.assign({}, BUTTON, { border: 'none', background: PRIMARY_FILL, color: PRIMARY_TEXT })
+      var DISABLED = { opacity: 0.4, cursor: 'not-allowed' }
+
+      /** A label/value line (the status row, in the shape the shipped cards use). */
+      function row(label, value, valueStyle) {
+        return h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px', fontSize: '12px', lineHeight: '18px' } },
+          h('span', { style: { flex: 'none', minWidth: '56px', color: MUTED } }, label),
+          h('span', { style: Object.assign({ minWidth: 0, color: TEXT }, valueStyle || {}) }, value))
+      }
+
+      /** An inline link in the accent color. */
+      function link(href, text) {
+        return h('a', { href: href, target: '_blank', rel: 'noreferrer', style: { color: ACCENT, fontSize: '12px', textDecoration: 'none' } }, text)
+      }
+
+      /** A capsule button; `primary` fills it, `disabled` dims it. */
+      function button(label, onClick, options) {
+        var opts = options || {}
+        return h('button', {
+          type: 'button',
+          onClick: onClick,
+          disabled: opts.disabled === true,
+          style: Object.assign({}, opts.primary === true ? PRIMARY_BUTTON : BUTTON, opts.disabled === true ? DISABLED : {}),
+        }, label)
+      }
+
+      /**
+       * Hide characters without turning the field into a password field, so the
+       * browser's password manager does not offer to store the key as a
+       * credential. `type="password"` is the fallback where `text-security` is
+       * unsupported; `autoComplete: 'off'` applies either way.
+       *
+       * @returns the extra style, or null when the standard password type must be used.
+       */
+      function maskStyle() {
         if (typeof CSS !== 'undefined' && 'textSecurity' in document.documentElement.style) {
-          p.style = { textSecurity: 'disc', WebkitTextSecurity: 'disc' }
-        } else {
-          p.type = 'password'
+          // Both spellings: browsers expose the property as `textSecurity` or
+          // `WebkitTextSecurity` depending on the engine.
+          return { textSecurity: 'disc', WebkitTextSecurity: 'disc' }
         }
-        return p
+        return null
       }
 
-      function Chevron(open) {
-        return h('svg', {
-          width: 16, height: 16, viewBox: '0 0 16 16',
-          style: { color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))', flex: 'none', transition: 'transform .16s', transform: open ? 'rotate(180deg)' : 'none' },
-        }, h('path', { d: 'M4 6l4 4 4-4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }))
+      /** A thrown value as note text. */
+      function describe(error) {
+        var message = error !== null && error !== undefined && error.message !== undefined ? error.message : error
+        return String(message)
       }
 
-      function ApplyLink(url, text) {
-        return h('a', { href: url, target: '_blank', rel: 'noreferrer', style: { color: 'var(--dsw-alias-accent, #4f8cff)', fontSize: '12px', textDecoration: 'none' } }, text)
-      }
-
-      return function MapToolsCard() {
-        var openState = react.useState(false)
-        var summaryState = react.useState(null)
-        var draftState = react.useState(null)
-        var noteState = react.useState('')
-        var savingState = react.useState(false)
-        var open = openState[0]
-        var summary = summaryState[0]
-        var draft = draftState[0]
-        var note = noteState[0]
-        var saving = savingState[0]
-
-        var load = react.useCallback(() => {
-          fetch('/dsh-map-tools/config').then((r) => r.json()).then((data) => {
-            summaryState[1](data)
-            draftState[1]({
-              provider: data.provider || 'amap',
-              amapKey: '',
-              timeoutMs: data.timeoutMs || 15000,
-            })
-          }).catch(() => {})
+      /**
+       * The card.
+       *
+       * @param props - the owner's props: `view: 'summary'` asks for the one-liner
+       *   alone (the legacy list seat does), `view: 'page'` for the form with its
+       *   own save control (the bundle seat only ever asks for this one).
+       * @returns the card.
+       */
+      return function MapToolsBundleCard(props) {
+        var view = props !== null && props !== undefined && props.view === 'summary' ? 'summary' : 'page'
+        var stateHook = react.useState({ status: 'loading', config: null, draft: null, note: '', tone: 'plain', saving: false })
+        var state = stateHook[0]
+        var setState = stateHook[1]
+        var merge = react.useCallback(function (next) {
+          setState(function (previous) { return Object.assign({}, previous, next) })
         }, [])
 
-        react.useEffect(() => {
-          // Load the summary on mount (not only on expand) so the collapsed
-          // header shows the provider status immediately instead of "加载中…".
-          if (summary === null) load()
-        }, [summary, load])
+        /** Read the summary again; every load re-seeds the draft from the host. */
+        var load = react.useCallback(function () {
+          return fetch(CONFIG_URL, { headers: { accept: 'application/json' } })
+            .then(function (response) {
+              if (!response.ok) throw new Error('HTTP ' + response.status)
+              return response.json()
+            })
+            .then(function (data) {
+              setState({ status: 'ready', config: data, draft: draftFrom(data), note: '', tone: 'plain', saving: false })
+            })
+            .catch(function (error) {
+              // The route is the only way in. With it missing, controls would take
+              // input nothing could accept, so the form is replaced by a line that
+              // says why rather than by fields that cannot save.
+              setState({ status: 'unavailable', config: null, draft: null, note: describe(error), tone: 'error', saving: false })
+            })
+        }, [])
 
+        react.useEffect(function () { void load() }, [load])
+
+        /** Write the staged patch, then re-seed from what the host accepted. */
         var save = function () {
-          if (!draft) return
-          savingState[1](true)
-          var payload = {}
-          if (draft.provider !== summary.provider) payload.provider = draft.provider
-          if (draft.amapKey !== '') payload.amapKey = draft.amapKey
-          if (draft.timeoutMs && draft.timeoutMs !== summary.timeoutMs) payload.timeoutMs = draft.timeoutMs
-          fetch('/dsh-map-tools/config', {
+          if (state.config === null || !draftValid(state.draft)) return
+          var body = configPatch(state.draft, state.config)
+          if (Object.keys(body).length === 0) {
+            // Nothing changed: saving stays idempotent instead of writing again.
+            merge({ note: '没有需要保存的改动', tone: 'plain' })
+            return
+          }
+          merge({ saving: true, note: '', tone: 'plain' })
+          fetch(CONFIG_URL, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(payload),
-          }).then((r) => r.json()).then((data) => {
-            summaryState[1](data)
-            noteState[1]('已保存 — 工具已重建，直接可用')
-            savingState[1](false)
-          }).catch((error) => {
-            noteState[1](`保存失败：${String(error?.message ?? error)}`)
-            savingState[1](false)
+            body: JSON.stringify(body),
           })
+            .then(function (response) {
+              return response.json().catch(function () { return {} }).then(function (data) {
+                if (!response.ok) throw new Error(data && data.error ? String(data.error) : 'HTTP ' + response.status)
+                return data
+              })
+            })
+            .then(function (accepted) {
+              // The host is the only authority on whether a write landed, so the
+              // form re-seeds from its answer instead of promoting the draft; the
+              // key input returns to blank because the key now lives in the file.
+              var merged = Object.assign({}, state.config, accepted)
+              setState({ status: 'ready', config: merged, draft: draftFrom(merged), note: '已保存 — 工具已重建，直接可用', tone: 'ok', saving: false })
+            })
+            .catch(function (error) {
+              // Keep **every** staged edit: a failed save is fixed in place rather
+              // than retyped, even the fields that may already have landed.
+              merge({ saving: false, note: '保存失败：' + describe(error), tone: 'error' })
+            })
         }
 
-        var discard = function () {
-          draftState[1](null)
-          noteState[1]('')
-          summaryState[1](null)
+        /** Open the config file in the OS editor (the route's `?open=true`). */
+        var openFile = function () {
+          fetch(CONFIG_URL + '?open=true', { headers: { accept: 'application/json' } })
+            .then(function (response) {
+              if (!response.ok) throw new Error('HTTP ' + response.status)
+              return response.json()
+            })
+            .then(function (data) {
+              merge({ config: Object.assign({}, state.config, data), note: '已在系统默认编辑器中打开配置文件', tone: 'plain' })
+            })
+            .catch(function (error) {
+              merge({ note: '打开配置文件失败：' + describe(error), tone: 'error' })
+            })
         }
 
-        var cardStyle = {
-          border: '1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35))',
-          borderRadius: '12px',
-          marginBottom: '8px', overflow: 'hidden',
-          transition: 'border-color .16s, background .16s',
-        }
-        var rowStyle = { padding: '14px 16px', display: 'flex', alignItems: 'center', gap: '12px' }
-        var fieldStyle = { display: 'flex', flexDirection: 'column', gap: '6px', padding: '4px 14px 10px' }
-        var labelStyle = { fontSize: '12px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))' }
+        // The bundle seat's page never asks for `summary`; the legacy list seat
+        // does, and renders this line as the card's one-liner under its title.
+        if (view === 'summary') return h('span', { style: HINT_STYLE }, statusLine(state.config))
 
-        return h('div', { style: Object.assign({}, cardStyle, {
-          background: open ? 'var(--dsw-alias-bg-layer-2, rgba(127,127,127,0.10))' : 'var(--dsw-alias-bg-layer-3, rgba(127,127,127,0.05))',
-        }) },
-          h('button', {
-            type: 'button',
-            'aria-expanded': open,
-            style: { ...rowStyle, width: '100%', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', textAlign: 'left' },
-            onClick: function () { openState[1](!open) },
-          },
-            h('div', { style: { flex: '1', minWidth: '0' } },
-              h('div', { style: { fontSize: '14px', fontWeight: 600 } }, '地图引擎 (dsh-map-tools)'),
-              h('div', { style: { fontSize: '13px', lineHeight: 1.5, color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } }, '地图定位与路径规划：驾车/公交/步行/骑行路线、地理编码、POI 搜索'),
-            ),
-            h('span', { style: { flex: 'none', fontSize: '12px', color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))' } },
-              summary ? (summary.provider ? (summary.provider === 'amap' ? '高德' : 'OSM') : '未配置') + (summary.hasAmapKey ? ' ✓' : '') : ''),
-            Chevron(open),
+        if (state.status === 'loading') return h('p', { style: HINT_STYLE, role: 'status' }, '读取配置中…')
+
+        if (state.status === 'unavailable') {
+          return h('div', { style: { display: 'flex', flexDirection: 'column', gap: '6px' } },
+            h('p', { style: Object.assign({}, HINT_STYLE, { color: ERROR }), role: 'status' },
+              '宿主路由 ' + CONFIG_URL + ' 当前不可用，无法在这里保存配置'
+              + (state.note === '' ? '' : '（' + state.note + '）') + '。'),
+            h('p', { style: CAPTION_STYLE }, '插件宿主半未加载时会这样；可直接编辑 ~/.dsh-map-tools/config.json（0600）。'))
+        }
+
+        var config = state.config
+        var draft = state.draft
+        var invalid = !draftValid(draft)
+        // 无改动可存、有非法值不可存、正在存不可重复提交——按钮状态就是这三条。
+        var blocked = !isDirty(draft, config) || invalid || state.saving
+        var noteColor = state.tone === 'error' ? ERROR : state.tone === 'ok' ? OK : HINT
+        var timeoutHint = invalid
+          ? '超时要是 ' + TIMEOUT_MIN_MS + '–' + TIMEOUT_MAX_MS + ' 之间的整数毫秒值；不合法时保存会被阻止，不会替你改写'
+          : '单次上游请求的超时，默认 ' + DEFAULT_TIMEOUT_MS + ' 毫秒'
+        var mask = maskStyle()
+        var keyStyle = mask === null ? CONTROL : Object.assign({}, CONTROL, mask)
+
+        return h('div', { style: { display: 'flex', flexDirection: 'column', paddingTop: '4px' } },
+          h('div', { style: FIRST_FIELD },
+            row('状态', statusLine(config), { color: config.provider === 'amap' && config.hasAmapKey ? OK : HINT }),
           ),
-          open && h('div', {},
-            h('div', { style: { padding: '0 14px 10px', fontSize: '12px', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))' } },
-              '地图定位与路径规划：驾车/公交/步行/骑行路线、地理编码、POI 搜索。配置数据存于 ~/.dsh-map-tools/config.json。'),
-            h('div', { style: fieldStyle },
-              h('span', { style: labelStyle }, '数据源'),
-              h('select', {
-                value: draft ? draft.provider : 'amap',
-                onChange: function (e) { draftState[1]({ ...(draft || {}), provider: e.target.value }) },
-                style: { padding: '6px 8px', borderRadius: '6px', border: '1px solid var(--dsw-alias-border, rgba(127,127,127,0.25))', background: 'var(--dsw-alias-bg-elevated, #262626)', color: 'inherit' },
-              }, PROVIDERS.map(function (p) { return h('option', { key: p.id, value: p.id }, p.label) })),
+          h('div', { style: FIELD },
+            h('label', { style: LABEL, htmlFor: 'dsh-map-tools-provider' }, '数据源'),
+            h('select', {
+              id: 'dsh-map-tools-provider',
+              value: draft.provider,
+              disabled: state.saving,
+              onChange: function (event) { merge({ draft: Object.assign({}, draft, { provider: event.target.value }) }) },
+              style: CONTROL,
+            }, PROVIDERS.map(function (provider) { return h('option', { key: provider.id, value: provider.id }, provider.label) })),
+            h('p', { style: CAPTION_STYLE }, '高德提供公交/POI/中文地址（需 key）；免费 OSM 只兜底驾车/步行/骑行路线，中文地址解析不可靠。'),
+          ),
+          h('div', { style: FIELD },
+            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px' } },
+              h('label', { style: LABEL, htmlFor: 'dsh-map-tools-key' }, '高德 key（Web 服务）'),
+              link(AMAP_URL, '如何获取高德 Key？'),
             ),
-            h('div', { style: fieldStyle },
-              h('span', { style: labelStyle }, '高德 key（Web 服务） — ', ApplyLink(AMAP_URL, '如何获取高德 Key？')),
-              h(Input, {
-                ...maskProps(),
-                placeholder: summary && summary.hasAmapKey ? '已配置（留空保持不变）' : 'amapKey',
-                value: draft ? draft.amapKey : '',
-                onChange: function (e) { draftState[1]({ ...(draft || {}), amapKey: e.target.value }) },
-              }),
-            ),
-            h('div', { style: fieldStyle },
-              h('span', { style: labelStyle }, '超时（毫秒）'),
-              h(Input, {
-                inputMode: 'numeric',
-                value: draft ? String(draft.timeoutMs) : '15000',
-                onChange: function (e) { draftState[1]({ ...(draft || {}), timeoutMs: Number(e.target.value) || 15000 }) },
-              }),
-            ),
-            note && h('div', { style: { padding: '0 14px 8px', fontSize: '12px', color: note.indexOf('失败') >= 0 ? '#e05c5c' : 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))' } }, note),
-            h('div', { style: { ...rowStyle, justifyContent: 'flex-end', borderTop: '1px solid var(--dsw-alias-border, rgba(127,127,127,0.2))' } },
-              h('button', { type: 'button', onClick: discard, disabled: saving, style: { background: 'none', border: 'none', cursor: 'pointer', color: 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))', fontSize: '13px' } }, '放弃'),
-              h('button', { type: 'button', onClick: save, disabled: saving || !draft, style: { background: 'var(--dsw-alias-accent, #4f8cff)', color: '#fff', border: 'none', borderRadius: '6px', padding: '6px 14px', cursor: 'pointer', fontSize: '13px' } }, saving ? '保存中…' : '保存'),
+            h('input', {
+              id: 'dsh-map-tools-key',
+              type: mask === null ? 'password' : 'text',
+              autoComplete: 'off',
+              value: draft.amapKey,
+              placeholder: config.hasAmapKey ? '已配置（留空即保持不变）' : '粘贴高德 Web 服务 key',
+              disabled: state.saving,
+              onChange: function (event) { merge({ draft: Object.assign({}, draft, { amapKey: event.target.value }) }) },
+              style: keyStyle,
+            }),
+            h('p', { style: CAPTION_STYLE }, 'key 只写进本机的 ' + (config.configPath || '~/.dsh-map-tools/config.json') + '，不回显、不进日志、不下发到页面。'),
+          ),
+          h('div', { style: FIELD },
+            h('label', { style: LABEL, htmlFor: 'dsh-map-tools-timeout' }, '超时（毫秒）'),
+            h('input', {
+              id: 'dsh-map-tools-timeout',
+              inputMode: 'numeric',
+              value: draft.timeoutMs,
+              disabled: state.saving,
+              'aria-invalid': invalid ? 'true' : 'false',
+              onChange: function (event) { merge({ draft: Object.assign({}, draft, { timeoutMs: event.target.value }) }) },
+              style: invalid ? Object.assign({}, CONTROL, { borderColor: ERROR }) : CONTROL,
+            }),
+            h('p', { style: invalid ? Object.assign({}, HINT_STYLE, { color: ERROR }) : CAPTION_STYLE }, timeoutHint),
+          ),
+          h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '12px', borderTop: SEPARATOR } },
+            button('打开配置文件', openFile, { disabled: state.saving }),
+            h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 } },
+              state.note === '' ? null : h('span', { role: 'status', style: { fontSize: '12px', lineHeight: 1.5, color: noteColor } }, state.note),
+              button(state.saving ? '保存中…' : '保存', save, { primary: true, disabled: blocked }),
             ),
           ),
         )
@@ -1121,7 +1397,7 @@ window.__ModuleLoader__.load({
      * 注册回合尾部的路线卡片。
      *
      * 两处注册相互独立、各自兜错：回合折叠定义失败不该影响工具卡片，
-     * 反之亦然（同一个 bundle 还挂着设置卡片，不能一起崩）。
+     * 反之亦然（同一个 bundle 还挂着 bundle 配置卡，不能一起崩）。
      */
     function registerTurnRouteCard(ctx) {
       if (!ctx || typeof ctx.inject !== 'function') return
@@ -1169,9 +1445,28 @@ window.__ModuleLoader__.load({
 
     exports.apply = apply
     exports.inject = []
-    exports.__card = { ConfigCard: ConfigCard }
     // 纯函数出口：供单元测试直接验证随包发布的这段代码（无构建步骤，
     // 所以测试跑的就是浏览器加载的同一份字节）。
+    exports.__card = {
+      ConfigCard: ConfigCard,
+      registerCard: registerCard,
+      registerOne: registerOne,
+      BUNDLE_SEAT: BUNDLE_SEAT,
+      LEGACY_SEAT: LEGACY_SEAT,
+      BUNDLE: BUNDLE,
+      CONFIG_URL: CONFIG_URL,
+      PROVIDERS: PROVIDERS,
+      DEFAULT_TIMEOUT_MS: DEFAULT_TIMEOUT_MS,
+      TIMEOUT_MIN_MS: TIMEOUT_MIN_MS,
+      TIMEOUT_MAX_MS: TIMEOUT_MAX_MS,
+      parseTimeout: parseTimeout,
+      effectiveConfig: effectiveConfig,
+      draftFrom: draftFrom,
+      draftValid: draftValid,
+      configPatch: configPatch,
+      isDirty: isDirty,
+      statusLine: statusLine,
+    }
     exports.__route = {
       ROUTE_TOOLS: ROUTE_TOOLS,
       parseArgs: parseArgs,

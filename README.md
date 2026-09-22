@@ -48,7 +48,7 @@
 - **零 key 也能用**：不配置 key 时，驾车 / 步行 / 骑行走免费 OSM/OSRM；中文地址解析不可靠时给出明确引导；配置高德 key 后无缝升级到全能力。
 - **key 不出服务端**：静态地图由**宿主**携带 key 去取，浏览器只加载一张本地图片；key 永不回显到页面或日志。
 - **卡片数据不占 token**：路线几何等卡片专用数据不进模型上下文。
-- **开箱即用的配置卡片**：设置 → 插件 → dsh-map-tools，选数据源、填 key（脱敏）、改超时，保存即生效，**无需重启**。
+- **开箱即用的配置卡片**：侧边栏**「插件」页 → dsh-map-tools**，bundle 详情页里就是配置区——选数据源、填 key（脱敏）、改超时，保存即生效，**无需重启**。（更老的宿主没有这个座位，卡片仍出现在 `设置 → 插件 → dsh-map-tools`。）
 - **与模型 / 提供方无关**：插件只提供工具与卡片，不读模型名、不分模型版本，换任何 DSH 支持的模型/提供方行为一致。
 
 ## 效果长什么样
@@ -98,7 +98,7 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 - 已在 **DSH 0.1.6-alpha.2 / 0.1.6-alpha.1 + Node v24** 实测全部功能；已兼容版本记录在 `package.json` 的 `dsh.compatibility.dshReleases`。
 - **插件不写死宿主版本号**：客户端卡片按**槽位实际声明**适配。`conversation.chat.turnTail` 在 0.1.6-alpha.2 由链式（`chain`，要 `select`）改成列表式（`list`，要 `id`），插件运行时读 `slots.spec()` 决定注册形状，因此同一份构建在两条发布线上都能让回合尾部的路线卡片正常出现（详见 [docs/dsh-map-tools-0.1.6兼容性说明.md](docs/dsh-map-tools-0.1.6兼容性说明.md)）。
 - **Node ≥ 20**。
-- 路线地图卡与设置卡片需要 **web profile**（`dsh.client.platform: web`）。TUI / headless 下 7 个工具照常可用，只是没有图形卡片。
+- 路线地图卡与配置页需要 **web profile**（`dsh.client.platform: web`）。TUI / headless 下 7 个工具照常可用，只是没有图形卡片。
 
 安装后**重启 `dsh web`**（或在启动器里按 `R`），在会话中即可使用 `map_*` 工具。
 
@@ -125,7 +125,7 @@ dsh plugin --profile web add /absolute/path/to/dsh-map-tools
 配置高德 key（约 2 分钟）：
 
 1. 打开 [高德开放平台](https://console.amap.com/dev/key/app) → 创建应用 → 申请 **「Web 服务」** 类型 key（个人开发者免费）。
-2. 在 DSH 的 **设置 → 插件 → dsh-map-tools** 填入 key，数据源选 `amap`，保存（立即生效）。
+2. 在 DSH 侧边栏的 **「插件」页 → dsh-map-tools** 填入 key，数据源选 `amap`，保存（立即生效）。
 3. 在会话里直接提问：
 
 ```
@@ -160,9 +160,13 @@ dsh plugin --profile web add /absolute/path/to/dsh-map-tools
 
 ## 配置
 
-### 设置卡片（推荐）
+### bundle 配置页（推荐）
 
-DSH 的 **设置 → 插件 → dsh-map-tools** 提供图形化卡片：数据源选择、高德 key 输入（脱敏，留空表示保持不变）、请求超时，并内置「如何获取高德 Key？」申请链接。保存后插件**重建工具实例**，立即生效。
+DSH 的**侧边栏「插件」页 → dsh-map-tools** 打开 bundle 详情页，**描述与行列表之间**就是本插件的配置区：顶部一行状态（数据源 · key 状态）、数据源选择、高德 key 输入（脱敏，留空表示保持不变）、请求超时，并内置「如何获取高德 Key？」申请链接和「打开配置文件」。保存后插件**重建工具实例**，立即生效。
+
+这一区渲染在宿主的 `plugins.bundle.config` 座位上（key = 包名 `dsh-map-tools`），页面骨架（标题、包名、描述、开关、卸载）由宿主自己画，插件只画内容。**更老的宿主**（DSH ≤ 0.1.5，没有这个座位）自动回落到 `设置 → 插件 → dsh-map-tools`，卡片内容完全一样。
+
+配置区的行为约定与官方配置页一致：改动**先暂存、点保存才落盘**（屏幕上看到的就是保存会写下的），**离开页面即丢弃**（所以没有「取消」按钮），**非法超时会拦住保存**而不是被悄悄改写成默认值，保存后**以宿主返回的值重新播种**（key 输入框随之为空）。
 
 ### 配置文件
 
@@ -180,7 +184,7 @@ DSH 的 **设置 → 插件 → dsh-map-tools** 提供图形化卡片：数据�
 }
 ```
 
-| 键 | 默认 | 设置卡片可改 | 说明 |
+| 键 | 默认 | 配置页可改 | 说明 |
 |---|---|---|---|
 | `provider` | `amap` | ✅ | `amap` = 高德（推荐，国内数据最全）；`osm` = 免费 OSM 兜底（无需 key，能力有限） |
 | `amapKey` | — | ✅ | 高德 **Web 服务** 类型 key，[免费申请](https://console.amap.com/dev/key/app) |
@@ -202,7 +206,7 @@ DSH 的 **设置 → 插件 → dsh-map-tools** 提供图形化卡片：数据�
     provider: amap
 ```
 
-**优先级：配置文件（设置卡片写入）> `cordis.yml` 默认值。**
+**优先级：配置文件（配置页写入）> `cordis.yml` 默认值。**
 
 ### 回环路由（进阶）
 
@@ -237,7 +241,7 @@ DSH 的 **设置 → 插件 → dsh-map-tools** 提供图形化卡片：数据�
 2. **每轮最多画 3 条路线**，超出只显示前 3 条并注明本轮总数。
 3. **地图卡会占用「回合尾部」的唯一席位**：本轮有路线时，官方「本轮产出文件」行本轮不渲染（卡片内注明产出文件数量）。这是该链式槽位的单选语义决定的，不是 bug。
 4. **公交换乘没有真实线路折线**：高德 v5 的公交折线实测为空值，卡片用「步行段起终点 + 上下车站点」连成的示意链表示。
-5. **地图卡与设置卡片只在 Web 客户端**；TUI / headless 只有工具文本。
+5. **地图卡与配置页只在 Web 客户端**；TUI / headless 只有工具文本。
 6. **「在高德打开」深链**使用官方 `uri.amap.com` 协议，尚未逐项实机验证；如遇异常欢迎提 [Issue](https://github.com/HorusJiang/dsh-map-tools/issues)。
 7. 免费源的频率限制与网络可达性不受本插件控制。
 
@@ -260,18 +264,19 @@ DSH 的 **设置 → 插件 → dsh-map-tools** 提供图形化卡片：数据�
 │    src/config-file.ts    ~/.dsh-map-tools/config.json 0600  │
 │    src/config-route.ts   GET/POST /dsh-map-tools/config     │
 │    src/staticmap-route.ts  GET /dsh-map-tools/staticmap     │
-│    src/settings-ns.ts    设置页 namespace 注册              │
+│    src/settings-ns.ts    老宿主设置页 namespace 注册         │
 └─────────────────┬───────────────────────────────────────────┘
                   │   presentationMeta（不进模型上下文）
 ┌─────────────────▼───────────────────────────────────────────┐
 │  浏览器半边  client/client.js（手写 lazy-CJS，零构建）      │
-│    - 设置 -> 插件 -> dsh-map-tools   配置卡片               │
+│    - 插件页 bundle 配置卡（plugins.bundle.config，key=包名） │
+│      老宿主回落到 设置 -> 插件（settings.plugin.item）       │
 │    - 回合尾部路线卡（conversation.chat.turnTail）           │
 │      真地图（宿主静态图）-> 取不到时退回自绘 SVG 示意图     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-- **配置优先级**：配置文件（设置卡片写入）→ `cordis.yml` 默认值。
+- **配置优先级**：配置文件（配置卡片写入）→ `cordis.yml` 默认值。
 - **保存即生效**：配置变更后工具实例自动重建，无需重启。
 - **无 MCP**：全部能力为 DSH 原生工具，不依赖外部 MCP 服务器进程。
 - **路线几何不进模型上下文**：它只用于画卡片，这也是卡片不占 token 的原因。
@@ -279,7 +284,7 @@ DSH 的 **设置 → 插件 → dsh-map-tools** 提供图形化卡片：数据�
 ## FAQ
 
 **Q：配置了高德 key，路线还是走 OSM？**
-A：检查配置文件的 `provider` 是否为 `amap`（不是 `osm`）、`amapKey` 是否非空。设置卡片顶部会显示当前数据源与 key 状态。
+A：检查配置文件的 `provider` 是否为 `amap`（不是 `osm`）、`amapKey` 是否非空。配置卡顶部的状态行会显示当前数据源与 key 状态。
 
 **Q：为什么公交换乘 / POI 搜索提示需要 key？**
 A：免费 OSM 源不提供公交换乘与 POI 数据，这两项能力必须用高德 key。

@@ -48,7 +48,7 @@ In one line: **turn "how do I get there" into 7 tools the model can call directl
 - **Works with zero keys**: without a key, driving / walking / bicycling fall back to free OSM/OSRM; unreliable Chinese geocoding is reported with clear guidance. Add an Amap key to upgrade to the full capability set.
 - **The key never leaves the host**: the static map is fetched by the **host** with the key; the browser only loads a local image. The key is never echoed to the page or the logs.
 - **Card data costs no tokens**: route geometry and other card-only data never enter the model context.
-- **Settings card out of the box**: Settings → Plugins → dsh-map-tools — pick a data source, paste a key (masked), adjust the timeout; saving takes effect instantly, **no restart**.
+- **Config page out of the box**: the sidebar **Plugins page → dsh-map-tools** — the bundle's detail page carries the configuration right there. Pick a data source, paste a key (masked), adjust the timeout; saving takes effect instantly, **no restart**. (Older hosts declare no such seat and the same card renders under `Settings → Plugins`.)
 - **Model- and provider-agnostic**: the plugin only ships tools and cards; it never reads the model name, so behaviour is identical on any model/provider DSH supports.
 
 ## What it looks like
@@ -97,7 +97,7 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 - **DeepSeek Harness ≥ 0.1.2-rc.1** (peer deps: `@deepseek-ai/dsh-settings`, `@deepseek-ai/dsh-tools`, `@deepseek-ai/cordis` ^4.0.2). Earlier release lines are unsupported because `@deepseek-ai/dsh-settings` removed its legacy API.
 - Verified end to end on **DSH 0.1.5-rc.1 + Node v24**; the compatible releases are recorded in `package.json` under `dsh.compatibility.dshReleases`.
 - **Node ≥ 20**.
-- The route map card and the settings card need the **web profile** (`dsh.client.platform: web`). On TUI / headless the 7 tools still work — there are simply no graphical cards.
+- The route map card and the config page need the **web profile** (`dsh.client.platform: web`). On TUI / headless the 7 tools still work — there are simply no graphical cards.
 
 Restart `dsh web` after installing (press `R` in the launcher), then use the `map_*` tools in a session.
 
@@ -124,7 +124,7 @@ This mounts the checkout via `link:`. Note that **source edits need `pnpm run bu
 Configure an Amap key (~2 minutes):
 
 1. Open the [Amap console](https://console.amap.com/dev/key/app) → create an app → request a **"Web Service"** key (free for individuals).
-2. In DSH **Settings → Plugins → dsh-map-tools**, paste the key, set the data source to `amap`, save (applies instantly).
+2. On DSH's sidebar **Plugins page → dsh-map-tools**, paste the key, set the data source to `amap`, save (applies instantly).
 3. Ask in a session:
 
 ```
@@ -159,9 +159,13 @@ Origins and destinations accept either **address text** or **`"lng,lat"` coordin
 
 ## Configuration
 
-### Settings card (recommended)
+### Bundle config page (recommended)
 
-DSH **Settings → Plugins → dsh-map-tools** offers a graphical card: data-source selector, masked Amap key input (leave blank to keep the current one), request timeout, plus a built-in "How to get an Amap key?" link. Saving **rebuilds the tool instances**, so it takes effect immediately.
+DSH's sidebar **Plugins page → dsh-map-tools** opens the bundle's detail page, and the configuration sits **between its description and its rows**: a status line (data source · key state), a data-source selector, the masked Amap key input (leave blank to keep the current one), the request timeout, plus a built-in "How to get an Amap key?" link and an "Open config file" action. Saving **rebuilds the tool instances**, so it takes effect immediately.
+
+The section renders into the host's `plugins.bundle.config` seat (keyed by the package name `dsh-map-tools`): the host draws the page chrome — title, package name, description, switch, uninstall — and the plugin draws only the content. **Older hosts** (DSH ≤ 0.1.5 declare no such seat) fall back to `Settings → Plugins → dsh-map-tools` with exactly the same card.
+
+Its behaviour matches the official configuration pages: edits are **staged and written only by Save** (what is on screen is what a save stores), **leaving the page discards them** (hence no Cancel control), an **invalid timeout blocks the save** instead of being silently rewritten, and after a save the form **re-seeds from what the host accepted**, which leaves the key input blank again.
 
 ### Config file
 
@@ -179,7 +183,7 @@ Config lives in **`~/.dsh-map-tools/config.json`** (mode 0600), decoupled from t
 }
 ```
 
-| Key | Default | In settings card | Notes |
+| Key | Default | In config page | Notes |
 |---|---|---|---|
 | `provider` | `amap` | ✅ | `amap` = Amap (recommended, best China coverage); `osm` = free OSM fallback (no key, limited) |
 | `amapKey` | — | ✅ | Amap **"Web Service"** key, [free to request](https://console.amap.com/dev/key/app) |
@@ -201,11 +205,11 @@ Defaults can also be supplied in the profile's `cordis.yml`:
     provider: amap
 ```
 
-**Priority: config file (written by the settings card) > `cordis.yml` defaults.**
+**Priority: config file (written by the config page) > `cordis.yml` defaults.**
 
 ### Loopback routes (advanced)
 
-The settings card talks to the plugin over same-origin loopback routes instead of writing DSH settings:
+The config page talks to the plugin over same-origin loopback routes instead of writing DSH settings:
 
 | Route | Purpose |
 |---|---|
@@ -236,7 +240,7 @@ Degradation is always **stated**, never silent and never faked:
 2. **At most 3 routes are drawn per turn**; beyond that the first 3 show plus the turn's total.
 3. **The map card occupies the turn tail's single seat**: when the turn has routes, the official "files produced this turn" row does not render (the card reports the count). That is the chained slot's single-winner semantics, not a bug.
 4. **Transit has no real polyline**: Amap v5 returns an empty transit polyline, so the card draws a schematic chain of walk segments and boarding/alighting stops.
-5. **The map card and the settings card are web-only**; TUI / headless get the tool text only.
+5. **The map card and the config page are web-only**; TUI / headless get the tool text only.
 6. The **"Open in Amap" deep link** uses the official `uri.amap.com` scheme and has not been verified case by case; please [open an issue](https://github.com/HorusJiang/dsh-map-tools/issues) if it misbehaves.
 7. Rate limits and reachability of the free public sources are outside this plugin's control.
 
@@ -264,13 +268,14 @@ Degradation is always **stated**, never silent and never faked:
                   │   presentationMeta (never enters the model context)
 ┌─────────────────▼─────────────────────────────────────────────┐
 │  Browser half  client/client.js (hand-written lazy-CJS)       │
-│    - Settings -> Plugins -> dsh-map-tools  settings card      │
+│    - Bundle config (plugins.bundle.config, key = package)     │
+│      older hosts fall back to Settings -> Plugins             │
 │    - Turn-tail route card (conversation.chat.turnTail)        │
 │      real map (host static image) -> self-drawn SVG sketch    │
 └───────────────────────────────────────────────────────────────┘
 ```
 
-- **Config priority**: config file (settings card) → `cordis.yml` defaults.
+- **Config priority**: config file (written by the config page) → `cordis.yml` defaults.
 - **Instant apply**: tool instances rebuild on config change; no restart.
 - **No MCP**: every capability is a native DSH tool; no external MCP server process.
 - **Route geometry never enters the model context**: it exists only to draw the card, which is why the card costs no tokens.
@@ -278,7 +283,7 @@ Degradation is always **stated**, never silent and never faked:
 ## FAQ
 
 **Q: I configured an Amap key but routes still use OSM.**
-A: Check the config file's `provider` is `amap` (not `osm`) and `amapKey` is non-empty. The settings card header shows the active source and key state.
+A: Check the config file's `provider` is `amap` (not `osm`) and `amapKey` is non-empty. The config card's status row shows the active source and key state.
 
 **Q: Why do transit / POI search ask for a key?**
 A: The free OSM sources provide neither transit nor POI data; those two need the Amap key.
