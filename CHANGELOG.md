@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.1] - 2026-09-22
+
+### Fixed
+
+- **配置页里"去哪拿高德 key"的申请链接看不见。** 链接本身一直都在，但颜色用的是
+  `--dsw-alias-brand-primary` —— 那是**中性色**（浅色 `neutral-bluish-1000`、深色
+  `bluish-50`），和正文同一个颜色，于是读起来就是一行普通文字（用户实测反馈"没有
+  api 获取链接"）。改用设计系统留给可点文字的 `--dsw-alias-link`
+  （`deepseek-500` / `deepseek-400`，界面里的 markdown 链接用的就是它），字号
+  12 → 13px，并从标签行里挪出来**独立成行**；没有 key 时再加一句引导（"还没有 key。
+  到高德控制台创建一个「Web 服务」类型的 key（免费），再粘贴到下面。"）。
+- 测试补两条守着这个坑：配置页必须带 `console.amap.com` 申请链接、且必须用
+  `--dsw-alias-link`；另加"没有 key 时的引导 + 独立链接"用例。主题 token 登记表
+  也把 `brand-primary` 换成了 `link`。
+
+### Changed
+
+- **发布改由 CI 执行**（`.github/workflows/release.yml`）：`v*` tag 触发 → 跑 CI
+  同款闸门 → `npm stage publish`（trusted publisher 配成 stage-only，此时谁都装不
+  到）→ 维护者用 2FA 批准 → 草稿 Release 转正。本地 `scripts/publish.mjs` 保留为
+  手动等价物，并且"发布成功"的判据改成**用全新缓存真把 tarball 拉下来**、再与本地
+  构建产物对照 sha1（npm 网站上的 `Published` 与 `npm view` 都比 tarball 传播得早，
+  不能当"能装上"的判据）。
+- CI 增加 `windows-latest` 矩阵与 node 20 产物舱位，并补跑 `smoke` /
+  `node --check client/client.js` / `check-tarball`。
+
 ## [0.7.0] - 2026-09-20
 
 ### Changed
