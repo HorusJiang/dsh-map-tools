@@ -248,7 +248,7 @@ window.__ModuleLoader__.load({
       var HINT = 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))'
       var BORDER = 'var(--dsw-alias-border-l4, rgba(127,127,127,0.3))'
       var SEPARATOR = '0.5px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.2))'
-      var ACCENT = 'var(--dsw-alias-brand-primary, #4f8cff)'
+      var LINK = 'var(--dsw-alias-link, #4f8cff)'
       var ERROR = 'var(--dsw-alias-state-error-primary, #e05c5c)'
       var OK = 'var(--dsw-alias-state-success-primary, #22a06b)'
       var FIELD_BG = 'var(--dsw-alias-bg-layer-3, rgba(127,127,127,0.08))'
@@ -261,6 +261,9 @@ window.__ModuleLoader__.load({
       var CONTROL = { width: '100%', boxSizing: 'border-box', height: '34px', padding: '0 12px', border: '0.5px solid ' + BORDER, borderRadius: '8px', background: FIELD_BG, font: 'inherit', fontSize: '13px', lineHeight: 1.5, color: TEXT }
       var HINT_STYLE = { margin: 0, fontSize: '12px', lineHeight: 1.5, color: HINT }
       var CAPTION_STYLE = { margin: 0, fontSize: '12px', lineHeight: 1.5, color: MUTED }
+      /** The Amap application link sits on its own line: a key is the one thing a
+       *  first-time user must go elsewhere to get, so it may not hide in a label row. */
+      var LINK_LINE = { margin: 0, fontSize: '13px', lineHeight: 1.5 }
       var BUTTON = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: '28px', padding: '0 12px', borderRadius: '14px', border: '0.5px solid ' + BORDER, background: 'transparent', font: 'inherit', fontSize: '12px', lineHeight: '18px', color: TEXT, cursor: 'pointer' }
       var PRIMARY_BUTTON = Object.assign({}, BUTTON, { border: 'none', background: PRIMARY_FILL, color: PRIMARY_TEXT })
       var DISABLED = { opacity: 0.4, cursor: 'not-allowed' }
@@ -272,9 +275,18 @@ window.__ModuleLoader__.load({
           h('span', { style: Object.assign({ minWidth: 0, color: TEXT }, valueStyle || {}) }, value))
       }
 
-      /** An inline link in the accent color. */
+      /**
+       * A link in the theme's link color.
+       *
+       * `--dsw-alias-link` (`deepseek-500` light / `deepseek-400` dark) is the token
+       * the design system keeps for clickable text, and the one Markdown links use
+       * in the shipped UI. The previous version reached for
+       * `--dsw-alias-brand-primary`, which is a *neutral* near-black (light) /
+       * near-white (dark) — i.e. the same color as body text, which is why the
+       * Amap application link was invisible on the card.
+       */
       function link(href, text) {
-        return h('a', { href: href, target: '_blank', rel: 'noreferrer', style: { color: ACCENT, fontSize: '12px', textDecoration: 'none' } }, text)
+        return h('a', { href: href, target: '_blank', rel: 'noreferrer', style: { color: LINK, fontSize: '13px', lineHeight: 1.5, textDecoration: 'none' } }, text)
       }
 
       /** A capsule button; `primary` fills it, `disabled` dims it. */
@@ -440,10 +452,10 @@ window.__ModuleLoader__.load({
             h('p', { style: CAPTION_STYLE }, '高德提供公交/POI/中文地址（需 key）；免费 OSM 只兜底驾车/步行/骑行路线，中文地址解析不可靠。'),
           ),
           h('div', { style: FIELD },
-            h('div', { style: { display: 'flex', alignItems: 'baseline', gap: '8px' } },
-              h('label', { style: LABEL, htmlFor: 'dsh-map-tools-key' }, '高德 key（Web 服务）'),
-              link(AMAP_URL, '如何获取高德 Key？'),
-            ),
+            h('label', { style: LABEL, htmlFor: 'dsh-map-tools-key' }, '高德 key（Web 服务）'),
+            // 还没有 key 的人必须一眼看到"去哪拿"：一句引导 + 独立成行的链接。
+            config.hasAmapKey ? null : h('p', { style: CAPTION_STYLE }, '还没有 key。到高德控制台创建一个「Web 服务」类型的 key（免费），再粘贴到下面。'),
+            h('p', { style: LINK_LINE }, link(AMAP_URL, config.hasAmapKey ? '获取 / 更换高德 Key →' : '获取高德 Key →')),
             h('input', {
               id: 'dsh-map-tools-key',
               type: mask === null ? 'password' : 'text',

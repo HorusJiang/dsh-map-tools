@@ -964,6 +964,11 @@ describe('bundle 配置卡片（plugins.bundle.config）', () => {
       expect(text).toContain('超时（毫秒）')
       expect(text).toContain('打开配置文件')
       expect(text).toContain('C:/x/config.json')
+      // 申请链接必须在页面上，而且用链接色（回归：曾经用 --dsw-alias-brand-primary
+      // 这个中性色，看起来跟正文一样，用户找不到"去哪拿 key"）。
+      expect(text).toContain('https://console.amap.com/dev/key/app')
+      expect(text).toContain('获取 / 更换高德 Key')
+      expect(text).toContain('--dsw-alias-link')
       // 没有改动 → 保存不可点（保存是显式动作，不是随打字落盘）。
       expect(findButton(page, '保存')?.props.disabled).toBe(true)
       expect(findButton(page, '保存中…')).toBeUndefined()
@@ -993,6 +998,29 @@ describe('bundle 配置卡片（plugins.bundle.config）', () => {
     }
   })
 
+  it('page：没有 key 时给出「去哪拿」的引导 + 独立成行的申请链接', async () => {
+    const fetchStub = vi.fn(() => Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ provider: 'osm', hasAmapKey: false, timeoutMs: 15000 }),
+    }))
+    vi.stubGlobal('fetch', fetchStub)
+    try {
+      const view = harness()
+      view.render({ view: 'page' })
+      view.runEffects()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const text = JSON.stringify(view.render({ view: 'page' }))
+      expect(text).toContain('还没有 key')
+      expect(text).toContain('https://console.amap.com/dev/key/app')
+      expect(text).toContain('获取高德 Key')
+      // 免费 OSM 下不需要 key，但引导与链接照样在（用户随时可以升级到高德）。
+      expect(text).toContain('免费 OSM · 无需 key')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('配置卡片只引用运行中真实存在的主题 token', () => {
     // 手写变量名是本项目踩过的坑：名字不存在时 fallback 会静默生效，深浅色就不跟随了。
     // 想在本区间引入新 token，先在这里登记（这一组按 ui-theme 的 design-platform.css 核对过）。
@@ -1000,12 +1028,12 @@ describe('bundle 配置卡片（plugins.bundle.config）', () => {
       '--dsw-alias-bg-layer-3',
       '--dsw-alias-border-l2',
       '--dsw-alias-border-l4',
-      '--dsw-alias-brand-primary',
       '--dsw-alias-button-primary-fill',
       '--dsw-alias-label-primary',
       '--dsw-alias-label-primary-foreground',
       '--dsw-alias-label-secondary',
       '--dsw-alias-label-tertiary',
+      '--dsw-alias-link',
       '--dsw-alias-state-error-primary',
       '--dsw-alias-state-success-primary',
     ]
