@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="dsh-map-tools">
+  <rect width="32" height="32" rx="7" fill="#0C1322"/>
+  <path d="M7 23 C 11 17, 13.5 21, 18 14 S 23.5 10.5, 25 9" fill="none" stroke="#3D7EFF" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="7" cy="23" r="2.6" fill="#2ED3B7"/>
+  <circle cx="25" cy="9" r="3" fill="#C8402F"/>
+</svg>

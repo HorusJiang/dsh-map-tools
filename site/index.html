@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dsh-map-tools — DeepSeek Harness 地图与路径规划插件</title>
+<meta name="description" content="给 DeepSeek Harness 的地图与路径规划原生工具：驾车 / 公交 / 步行 / 骑行路线、地理编码、逆地理编码、POI 搜索。模型直接调用，不需要 MCP；算出来的路线会画成真地图卡片，出现在最终回答的下方。">
+<meta name="theme-color" content="#070B14">
+<meta property="og:type" content="website">
+<meta property="og:title" content="dsh-map-tools — DeepSeek Harness 地图与路径规划插件">
+<meta property="og:description" content="7 个原生工具，不是 MCP；算出来的路线画成真地图卡片，出现在最终回答的下方。">
+<meta property="og:image" content="assets/card-turn-tail.png">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#070B14; --bg-2:#0A101D; --surface:#0F1728; --surface-2:#141F35;
+  --line:rgba(140,170,220,.13); --line-2:rgba(140,170,220,.26);
+  --text:#E6ECF7; --text-2:#8FA3C0; --text-3:#61748F;
+  --brand:#3D7EFF; --brand-2:#6FA2FF; --brand-soft:rgba(61,126,255,.13);
+  --teal:#2ED3B7; --gold:#E9DCBB; --seal:#C8402F;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC",SimSun,Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --mono:"JetBrains Mono","Cascadia Mono",Consolas,"Courier New",monospace;
+  --r:14px; --maxw:1120px;
+}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.7;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(140,170,220,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(140,170,220,.05) 1px,transparent 1px);
+  background-size:64px 64px;
+  -webkit-mask-image:radial-gradient(ellipse 100% 55% at 50% 0%,#000 25%,transparent 72%);
+  mask-image:radial-gradient(ellipse 100% 55% at 50% 0%,#000 25%,transparent 72%)}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;position:relative;z-index:1}
+a{color:var(--brand-2)}
+code{font-family:var(--mono)}
+
+.nav{position:sticky;top:0;z-index:60;background:rgba(7,11,20,.76);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.nav-in{display:flex;align-items:center;gap:18px;height:60px}
+.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--text);font-weight:600;font-size:15.5px;letter-spacing:.1px;white-space:nowrap}
+.brand svg{width:23px;height:23px;flex:none}
+.ver{font-family:var(--mono);font-size:11px;font-weight:500;color:var(--brand-2);background:var(--brand-soft);border:1px solid rgba(61,126,255,.3);padding:1px 7px;border-radius:99px;margin-left:2px}
+.nav-links{display:flex;gap:2px;margin-left:auto}
+.nav-links a{color:var(--text-2);text-decoration:none;font-size:14px;padding:6px 11px;border-radius:8px;transition:background .15s,color .15s;white-space:nowrap}
+.nav-links a:hover{color:var(--text);background:rgba(140,170,220,.08)}
+.nav-links a.active{color:var(--brand-2);background:var(--brand-soft)}
+.nav-act{display:flex;gap:8px;align-items:center;margin-left:8px}
+.nav-act a{font-size:13.5px;color:var(--text-2);text-decoration:none;border:1px solid var(--line);padding:5px 12px;border-radius:8px;transition:.15s;white-space:nowrap}
+.nav-act a:hover{color:var(--text);border-color:var(--line-2);background:rgba(140,170,220,.06)}
+@media(max-width:940px){.nav-links{display:none}}
+@media(max-width:560px){.nav-act a:first-child{display:none}.cmd{font-size:12.5px;height:44px;padding:0 4px 0 12px}.copy{height:44px;padding:0 14px}.hero{padding:48px 0 44px}.sec{padding:52px 0}}
+
+.hero{position:relative;padding:74px 0 68px;overflow:hidden}
+.hero-route{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.75}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;letter-spacing:.5px;color:var(--brand-2);background:var(--brand-soft);border:1px solid rgba(61,126,255,.26);padding:5px 13px;border-radius:99px}
+.eyebrow i{width:6px;height:6px;border-radius:99px;background:var(--teal);flex:none}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(40px,7.2vw,70px);line-height:1.1;letter-spacing:-.5px;color:#F4EDDD;margin:24px 0 0}
+.lede{font-size:clamp(15.5px,2vw,19px);line-height:1.68;color:var(--text-2);max-width:680px;margin:18px 0 0}
+.lede b{color:#CFDCF0;font-weight:500}
+.install{display:flex;align-items:stretch;gap:10px;margin-top:32px;flex-wrap:wrap}
+.install>*{min-width:0}
+.cmd{display:flex;align-items:center;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;font-family:var(--mono);font-size:14px;background:var(--surface);border:1px solid var(--line-2);border-radius:11px;padding:0 6px 0 16px;color:#CFE0FF;height:48px}
+.cmd::-webkit-scrollbar{display:none}
+.cmd .line{white-space:nowrap}
+.cmd .pr{color:var(--teal);margin-right:9px;user-select:none}
+.cmd .kw{color:var(--brand-2)}
+.copy{font-family:var(--sans);font-size:13.5px;font-weight:500;color:var(--text-2);background:var(--surface-2);border:1px solid var(--line-2);border-radius:11px;padding:0 18px;height:48px;cursor:pointer;transition:.16s;display:inline-flex;align-items:center;gap:7px}
+.copy:hover{color:var(--text);border-color:rgba(140,170,220,.42)}
+.copy.ok{color:var(--teal);border-color:rgba(46,211,183,.45);background:rgba(46,211,183,.08)}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.pill{font-size:12.5px;color:var(--text-2);border:1px solid var(--line);background:rgba(15,23,40,.72);padding:5px 12px;border-radius:99px;white-space:nowrap}
+.pill b{color:#DCE6F5;font-weight:500}
+.shot{margin:50px 0 0;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;background:var(--bg-2);box-shadow:0 30px 74px -30px rgba(0,0,0,.9)}
+.shot img{display:block;width:100%;height:auto}
+.shot figcaption{padding:13px 18px;font-size:13px;color:var(--text-3);border-top:1px solid var(--line);line-height:1.6}
+
+.sec{padding:74px 0;border-top:1px solid var(--line);position:relative;z-index:1}
+.sec-head{margin-bottom:32px}
+h2{font-size:clamp(22px,3.1vw,29px);font-weight:600;letter-spacing:-.2px;color:#EEF3FB;margin:0}
+.sub{color:var(--text-2);margin:12px 0 0;max-width:740px;font-size:15px}
+.grid{display:grid;gap:16px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:900px){.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:640px){.g3,.g2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;transition:border-color .18s,transform .18s}
+.card:hover{border-color:var(--line-2);transform:translateY(-2px)}
+.card h3{margin:0 0 9px;font-size:15.5px;font-weight:600;color:#EAF1FC;display:flex;align-items:center;gap:10px}
+.card p{margin:0;color:var(--text-2);font-size:14px;line-height:1.72}
+.ico{width:29px;height:29px;border-radius:9px;background:var(--brand-soft);border:1px solid rgba(61,126,255,.26);display:grid;place-items:center;flex:none}
+.ico svg{width:15px;height:15px;stroke:#7EA9FF;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--bg-2)}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:640px}
+th{text-align:left;font-weight:600;font-size:12.5px;letter-spacing:.4px;color:#D6E2F5;padding:13px 16px;background:rgba(140,170,220,.055);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--line);color:var(--text-2);vertical-align:top;line-height:1.65}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:rgba(140,170,220,.035)}
+td code{font-size:12.5px;color:#CFE0FF;background:rgba(61,126,255,.11);border:1px solid rgba(61,126,255,.2);padding:1px 6px;border-radius:5px;white-space:nowrap}
+.yes,.no,.warn{white-space:nowrap}
+.yes{color:var(--teal);font-weight:500}
+.no{color:var(--text-3)}
+.warn{color:#E0A85C}
+
+.steps{display:grid;gap:12px}
+.step{display:flex;gap:16px;padding:20px 22px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r)}
+.n{flex:none;width:30px;height:30px;border-radius:9px;background:var(--brand-soft);border:1px solid rgba(61,126,255,.32);color:var(--brand-2);font-family:var(--mono);font-size:13px;font-weight:600;display:grid;place-items:center}
+.step h3{margin:2px 0 6px;font-size:15px;font-weight:600;color:#E9F0FB}
+.step p{margin:0;color:var(--text-2);font-size:14px;line-height:1.7}
+.step code{font-size:12.5px;color:#CFE0FF;background:rgba(61,126,255,.11);border:1px solid rgba(61,126,255,.2);padding:1px 6px;border-radius:5px}
+.ask{margin-top:18px;background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px}
+.ask h3{margin:0 0 12px;font-size:14px;font-weight:600;color:#E9F0FB}
+.ask ul{margin:0;padding:0;list-style:none;display:grid;gap:9px}
+.ask li{font-family:var(--mono);font-size:13px;color:#B9CBEA;background:rgba(61,126,255,.07);border:1px solid rgba(61,126,255,.16);border-radius:9px;padding:10px 14px;line-height:1.6}
+.ask li::before{content:"›";color:var(--brand-2);margin-right:9px}
+
+.arch{display:grid;gap:0}
+.layer{background:var(--bg-2);border:1px solid var(--line);border-radius:var(--r);padding:18px 22px}
+.layer h4{margin:0;font-size:14.5px;font-weight:600;color:#E4EDFA;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.layer .tag{font-family:var(--mono);font-size:11.5px;color:var(--text-3);font-weight:400;border:1px solid var(--line);padding:1px 8px;border-radius:6px}
+.layer ul{margin:12px 0 0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:7px}
+.layer li{font-family:var(--mono);font-size:12.5px;color:var(--text-2);border:1px solid var(--line);background:rgba(140,170,220,.05);padding:3px 10px;border-radius:7px}
+.arrow{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px 0;color:var(--text-3);font-size:12px;font-family:var(--mono)}
+.arrow span{height:1px;width:34px;background:var(--line-2)}
+.layer.hl{border-color:rgba(61,126,255,.32);background:linear-gradient(180deg,rgba(61,126,255,.07),var(--bg-2))}
+
+details{border:1px solid var(--line);border-radius:12px;background:var(--bg-2);margin-bottom:10px;overflow:hidden;transition:border-color .18s}
+details[open]{border-color:var(--line-2)}
+summary{cursor:pointer;padding:16px 20px;font-size:14.5px;font-weight:500;color:#DDE7F5;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:14px}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";font-family:var(--mono);font-size:17px;color:var(--text-3);flex:none;transition:color .18s}
+details[open] summary::after{content:"−";color:var(--brand-2)}
+.body{padding:0 20px 18px;color:var(--text-2);font-size:14px;line-height:1.78}
+.body code{font-size:12.5px;color:#CFE0FF;background:rgba(61,126,255,.11);border:1px solid rgba(61,126,255,.2);padding:1px 6px;border-radius:5px}
+
+.limits{margin:0;padding:0;list-style:none;display:grid;gap:10px;counter-reset:l}
+.limits li{counter-increment:l;position:relative;padding:15px 20px 15px 54px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;color:var(--text-2);font-size:14px;line-height:1.72}
+.limits li::before{content:counter(l);position:absolute;left:18px;top:15px;font-family:var(--mono);font-size:12.5px;color:var(--text-3);width:22px;height:22px;border:1px solid var(--line);border-radius:7px;display:grid;place-items:center}
+.limits b{color:#D6E2F5;font-weight:500}
+
+footer{border-top:1px solid var(--line);background:var(--bg-2);padding:52px 0 64px;position:relative;z-index:1}
+.flinks{display:flex;flex-wrap:wrap;gap:10px 26px;margin:0 0 24px;padding:0;list-style:none}
+.flinks a{color:var(--text-2);text-decoration:none;font-size:14px}
+.flinks a:hover{color:var(--brand-2)}
+.fine{color:var(--text-3);font-size:13px;line-height:1.8;margin:0}
+.fine a{color:var(--text-2);text-decoration:none}
+.fine a:hover{color:var(--brand-2)}
+.fbrand{display:flex;align-items:center;gap:9px;margin-bottom:20px;color:var(--text-2);font-size:14px}
+.fbrand svg{width:22px;height:22px}
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0F1728"/><path d="M7 23 C 11 17, 13.5 21, 18 14 S 23.5 10.5, 25 9" fill="none" stroke="#3D7EFF" stroke-width="2.2" stroke-linecap="round"/><circle cx="7" cy="23" r="2.6" fill="#2ED3B7"/><circle cx="25" cy="9" r="3" fill="#C8402F"/></svg>
+      dsh-map-tools<span class="ver">0.7.1</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#features">特性</a>
+      <a href="#showcase">效果</a>
+      <a href="#tools">工具</a>
+      <a href="#start">上手</a>
+      <a href="#arch">架构</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-act">
+      <a href="https://github.com/HorusJiang/dsh-map-tools/blob/master/README.en.md" target="_blank" rel="noopener">English</a>
+      <a href="https://www.npmjs.com/package/dsh-map-tools" target="_blank" rel="noopener">npm</a>
+      <a href="https://github.com/HorusJiang/dsh-map-tools" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<section class="hero" id="top">
+  <svg class="hero-route" viewBox="0 0 1440 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path d="M-60 486 C 180 442, 250 236, 432 262 S 700 448, 884 336 S 1130 116, 1500 172" fill="none" stroke="rgba(61,126,255,.13)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M-60 486 C 180 442, 250 236, 432 262 S 700 448, 884 336 S 1130 116, 1500 172" fill="none" stroke="rgba(61,126,255,.4)" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 0"/>
+    <circle cx="432" cy="262" r="5" fill="#2ED3B7" opacity=".9"/>
+    <circle cx="884" cy="336" r="5" fill="#3D7EFF" opacity=".85"/>
+    <circle cx="1500" cy="172" r="7" fill="#C8402F" opacity=".75"/>
+  </svg>
+  <div class="wrap">
+    <div class="eyebrow"><i></i>DeepSeek Harness 原生工具插件</div>
+    <h1>dsh-map-tools</h1>
+    <p class="lede">把「路怎么走」变成模型能<b>直接调用</b>的 7 个工具，并把结果<b>画成看得见的地图</b>。不用 MCP，没有额外进程；算出来的路线会出现在最终回答的下方。</p>
+
+    <div class="install">
+      <span class="cmd"><span class="pr">$</span><span class="line">dsh plugin --profile web <span class="kw">add</span> dsh-map-tools</span></span>
+      <button class="copy" data-copy="dsh plugin --profile web add dsh-map-tools">复制命令</button>
+    </div>
+
+    <div class="meta">
+      <span class="pill">版本 <b>0.7.1</b></span>
+      <span class="pill">许可 <b>MIT</b></span>
+      <span class="pill">DSH <b>≥ 0.1.2-rc.1</b></span>
+      <span class="pill">Node <b>≥ 20</b></span>
+      <span class="pill">已收录 <b>dshmarket</b></span>
+      <span class="pill">零依赖 · <b>无 MCP</b></span>
+    </div>
+
+    <figure class="shot">
+      <img src="assets/card-turn-tail.png" alt="回合尾部的路线地图卡：高德真底图 + 蓝色路线折线 + 起终点标注 + 距离、耗时、步数与「在高德打开」深链">
+      <figcaption>实机截图：收尾正文下方的路线地图卡 —— 驾车 10.8 公里 / 约 20 分钟 / 共 12 步。蓝色折线是高德绘制的真实路线。</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="sec" id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>为什么用它</h2>
+      <p class="sub">六件事决定了它和一个「套壳地图 API」的区别。</p>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h7"/></svg></span>7 个原生工具</h3>
+        <p>走 DSH 的 <code>ctx.tools</code> 注册，不是 MCP，没有额外进程要维护。装一个包就有全部地图能力。</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M4 18 C 8 18, 9 8, 13 8 S 18 13, 20 6"/><circle cx="4" cy="18" r="1.6"/><circle cx="20" cy="6" r="1.6"/></svg></span>路线画在真地图上</h3>
+        <p>收尾正文之后出现一张真地图：高德底图 + 高德绘制的路线折线 + 起终标注。一轮算了几条就画几条，不会再出现「正文讲 A、地图画 B」。</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v10"/><path d="M8.5 9.5 12 13l3.5-3.5"/><rect x="4" y="15" width="16" height="6" rx="2"/></svg></span>零 key 也能用</h3>
+        <p>不配置 key 时，驾车 / 步行 / 骑行走免费的 OSM / OSRM；中文地址解析不可靠时给出明确引导。配置高德 key 后无缝升级到全能力。</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico"><svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3"/></svg></span>key 不出服务端</h3>
+        <p>静态地图由<strong>宿主</strong>携带 key 去取，浏览器只加载一张本地图片。key 永不回显到页面或日志。</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6l1-7Z"/></svg></span>卡片数据不占 token</h3>
+        <p>路线几何与起终点名走 <code>presentationMeta</code> 持久化到会话日志，只用于渲染卡片，不进入模型上下文。</p>
+      </article>
+      <article class="card">
+        <h3><span class="ico"><svg viewBox="0 0 24 24"><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><circle cx="12" cy="12" r="3.2"/></svg></span>与模型无关</h3>
+        <p>插件只提供工具与卡片，不读模型名、不分模型版本。换任何 DSH 支持的模型或提供方，行为一致。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="showcase">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>效果长什么样</h2>
+      <p class="sub">一次路线问答里，界面会出现三处内容。地图只在最终结果处出现一次 —— 过程区会随思考反复重绘，放在那里就是闪烁。</p>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>位置</th><th>内容</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td>过程区（「思考」块）</td><td>紧凑摘要 + 可折叠路书</td><td>不渲染地图，省掉一次取图</td></tr>
+          <tr><td>收尾正文</td><td>距离、耗时、分段指引、「在高德打开 ↗」</td><td>模型可见文本，模型据此作答</td></tr>
+          <tr><td>收尾正文<b>之后</b>（回合尾部）</td><td>路线地图卡：真地图 + 起终点 + 距离 / 耗时 / 步数 + 深链</td><td>本轮每条路线一张，标注「第 k/N 条」；超过 3 条只显示前 3 条并注明总数</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <article class="card">
+        <h3>卡片的四种形态（都不会空白）</h3>
+        <p><b style="color:#D6E2F5;font-weight:500">运行中</b> — 显示「规划中…」<br>
+        <b style="color:#D6E2F5;font-weight:500">成功 + 有几何</b> — 真地图（高德静态图）<br>
+        <b style="color:#D6E2F5;font-weight:500">成功但取不到真地图</b> — 自动退回自绘 SVG 示意图：不请求外部网络、不需要前端 key，路线走向、起终点、距离耗时照常显示<br>
+        <b style="color:#D6E2F5;font-weight:500">失败</b> — 显示错误文本，不会被吞掉</p>
+      </article>
+      <article class="card">
+        <h3>模型可见文本里有什么</h3>
+        <p>距离、耗时、步数、数据源；分段指引 <b style="color:#D6E2F5;font-weight:500">≤ 24 步全部给出</b>，更长时给前 16 步 + 「中间省略 N 步」+ <b style="color:#D6E2F5;font-weight:500">最后 6 步</b>（到达段永远在，模型没有理由再去补算）。坐标入参会回显反查后的地名并标注「（坐标反查）」，传错起点一眼可见。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="tools">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>7 个工具</h2>
+      <p class="sub">起点 / 终点统一接受<b>地址文本</b>或 <code>"lng,lat"</code> 坐标两种形式，插件自动归一化。</p>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>工具</th><th>作用</th><th>参数</th><th>免费 OSM</th><th>高德</th></tr></thead>
+        <tbody>
+          <tr><td><code>map_driving_route</code></td><td>驾车路线规划</td><td><code>origin</code>、<code>destination</code>（必填）；<code>waypoints</code>（仅高德）；<code>alternatives</code></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td><code>map_walking_route</code></td><td>步行路线规划</td><td><code>origin</code>、<code>destination</code></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td><code>map_bicycling_route</code></td><td>骑行路线规划</td><td><code>origin</code>、<code>destination</code></td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td><code>map_transit_route</code></td><td>公交 / 地铁换乘</td><td><code>origin</code>、<code>destination</code></td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td><code>map_geocode</code></td><td>地址 → 经纬度</td><td><code>address</code></td><td class="warn">中文不可靠</td><td class="yes">✓</td></tr>
+          <tr><td><code>map_reverse_geocode</code></td><td>经纬度 → 结构化地址</td><td><code>location</code></td><td class="warn">中文不可靠</td><td class="yes">✓</td></tr>
+          <tr><td><code>map_poi_search</code></td><td>兴趣点搜索</td><td><code>keywords</code>；<code>location</code>（周边搜索中心）；<code>radiusM</code>（默认 1000，最大 50000）；<code>region</code>；<code>types</code></td><td class="no">—</td><td class="yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <article class="card">
+        <h3>高德（amap）— 推荐数据源</h3>
+        <p>覆盖全部 7 个工具。国内数据最全：公交换乘、POI、稳定的中文地理编码。个人开发者可免费申请「Web 服务」类型 key。</p>
+      </article>
+      <article class="card">
+        <h3>免费源 — 零 key 兜底</h3>
+        <p>OSRM（驾车 / 步行 / 骑行）与 Photon / Nominatim（地理编码）。免费公共实例有频率限制；<b style="color:#D6E2F5;font-weight:500">中文地址解析不可靠是刻意保留的设计</b>，不试图「修好」，而是给出清晰的补救路径。</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="start">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>三步上手</h2>
+      <p class="sub">配置高德 key 大约 2 分钟；不配也能先用免费源跑起来。</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <div>
+          <h3>申请一个「Web 服务」类型的 key</h3>
+          <p>打开<a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener">高德开放平台</a> → 创建应用 → 申请 <b style="color:#D6E2F5;font-weight:500">「Web 服务」</b> 类型 key（个人开发者免费）。注意不是 JS API 类型。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <div>
+          <h3>在插件页的配置卡里填入</h3>
+          <p>DSH 侧边栏的 <b style="color:#D6E2F5;font-weight:500">「插件」页 → dsh-map-tools</b>（bundle 详情页里就是配置区）：数据源选 <code>amap</code>，粘贴 key（脱敏显示，留空表示保持不变），保存即生效，<b style="color:#D6E2F5;font-weight:500">无需重启</b>。卡里直接带「获取高德 Key →」的申请链接。</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <div>
+          <h3>在会话里直接提问</h3>
+          <p>模型会自己选工具、自己算，最后把路线画在回答下方。点卡片上的「在高德打开 ↗」可在高德 App 或网页里继续导航。</p>
+        </div>
+      </div>
+    </div>
+    <div class="ask">
+      <h3>可以直接这样问</h3>
+      <ul>
+        <li>从北京南站到首都机场T3，规划驾车路线</li>
+        <li>把「西湖区文三路478号」转成经纬度</li>
+        <li>116.397428,39.90923 附近 1 公里内有什么加油站？</li>
+      </ul>
+    </div>
+    <div class="tw" style="margin-top:24px">
+      <table>
+        <thead><tr><th>配置项</th><th>默认</th><th>说明</th></tr></thead>
+        <tbody>
+          <tr><td><code>provider</code></td><td><code>amap</code></td><td>数据源。<code>amap</code> = 高德（推荐）；<code>osm</code> = 免费 OSM 兜底</td></tr>
+          <tr><td><code>amapKey</code></td><td>—</td><td>高德 Web 服务类型 key，需<a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener">免费申请</a>。只以 <code>hasAmapKey</code> 布尔值呈现给前端，永不回显</td></tr>
+          <tr><td><code>timeoutMs</code></td><td><code>15000</code></td><td>单次请求超时（毫秒）</td></tr>
+          <tr><td><code>maxQps</code></td><td><code>2</code></td><td>每秒最大请求数。默认低于常见上限 3，防触发 <code>10021</code> 配额错误</td></tr>
+          <tr><td><code>defaultMode</code></td><td><code>driving</code></td><td>默认路线模式</td></tr>
+          <tr><td><code>language</code></td><td><code>zh</code></td><td>返回语言</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="sub" style="margin-top:14px;font-size:13.5px">配置存储在 <code style="font-family:var(--mono);color:#CFE0FF">~/.dsh-map-tools/config.json</code>（权限 0600），与 DSH 设置文档解耦、跨 profile 共享。优先级：配置文件 &gt; <code style="font-family:var(--mono);color:#CFE0FF">cordis.yml</code> 默认值。</p>
+  </div>
+</section>
+
+<section class="sec" id="arch">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>架构</h2>
+      <p class="sub">宿主半边负责取数与安全，浏览器半边只负责画。卡片专用数据走 <code>presentationMeta</code>，绕开模型上下文。</p>
+    </div>
+    <div class="arch">
+      <div class="layer hl">
+        <h4>模型 <span class="tag">任意 DSH 支持的模型 / 提供方</span></h4>
+        <ul>
+          <li>map_driving_route</li><li>map_transit_route</li><li>map_walking_route</li><li>map_bicycling_route</li><li>map_geocode</li><li>map_reverse_geocode</li><li>map_poi_search</li>
+        </ul>
+      </div>
+      <div class="arrow"><span></span>ctx.tools · defineTool<span></span></div>
+      <div class="layer">
+        <h4>宿主半边 <span class="tag">TypeScript → lib/</span></h4>
+        <ul>
+          <li>tools/ 工具定义与模型可见文本</li><li>clients/amap.ts 高德 Web 服务</li><li>clients/osrm.ts 免费路线</li><li>clients/photon.ts · nominatim.ts 免费地理编码</li><li>geo.ts 几何解码 / 抽稀 / 编码</li><li>config-file.ts 0600 配置</li><li>config-route.ts 回环路由</li><li>staticmap-route.ts 静态地图</li>
+        </ul>
+      </div>
+      <div class="arrow"><span></span>presentationMeta · 不进模型上下文<span></span></div>
+      <div class="layer">
+        <h4>浏览器半边 <span class="tag">client/client.js · 手写 lazy-CJS，零构建</span></h4>
+        <ul>
+          <li>插件页 bundle 配置卡（plugins.bundle.config）</li><li>回合尾部路线卡（conversation.chat.turnTail）</li><li>真地图 → 取不到时退回自绘 SVG</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="limits">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>已知限制</h2>
+      <p class="sub">都是明说的，不静默失败、不伪造结果。</p>
+    </div>
+    <ol class="limits">
+      <li><b>卡片只镜像本回合的路线调用。</b>若模型在本轮只算了一段用于核对细节的分段路线，卡片显示的就是那段。工具描述里已写明这条契约。</li>
+      <li><b>每轮最多画 3 条路线</b>，超出只显示前 3 条并注明本轮总数。</li>
+      <li><b>地图卡会占用「回合尾部」的唯一席位：</b>本轮有路线时，官方「本轮产出文件」行本轮不渲染（卡片内会注明产出文件数量）。这是该槽位的单选语义决定的，不是 bug。</li>
+      <li><b>公交换乘没有真实线路折线：</b>高德 v5 的公交折线实测为空值，卡片用「步行段起终点 + 上下车站点」连成的示意链表示。</li>
+      <li><b>地图卡与配置页只在 Web 客户端：</b>TUI / headless 下 7 个工具照常可用，只是没有图形卡片。</li>
+      <li><b>「在高德打开」深链</b>使用官方 <code>uri.amap.com</code> 协议，尚未逐项实机验证。</li>
+      <li><b>免费源的频率限制与网络可达性</b>不受本插件控制。</li>
+    </ol>
+  </div>
+</section>
+
+<section class="sec" id="faq">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>常见问题</h2>
+    </div>
+    <details open>
+      <summary>配置了高德 key，路线还是走 OSM？</summary>
+      <div class="body">检查配置文件的 <code>provider</code> 是否为 <code>amap</code>（不是 <code>osm</code>）、<code>amapKey</code> 是否非空。配置卡顶部的状态行会显示当前数据源与 key 状态。</div>
+    </details>
+    <details>
+      <summary>为什么公交换乘 / POI 搜索提示需要 key？</summary>
+      <div class="body">免费 OSM 源不提供公交换乘与 POI 数据，这两项能力必须用高德 key。</div>
+    </details>
+    <details>
+      <summary>高德 key 被拒 / 报错怎么办？</summary>
+      <div class="body">确认申请的是「Web 服务」类型 key（不是 JS API / Web 端 key），并在高德控制台确认对应服务已启用。报 <code>10021</code> 说明触发 QPS 配额，可调低 <code>maxQps</code>（默认 2）或降低请求频率。</div>
+    </details>
+    <details>
+      <summary>中文地址解析报「免费数据源不可用」？</summary>
+      <div class="body">免费源（Photon / Nominatim）对中文支持差，且部分国内网络不可达。这是设计行为 —— 直接传 <code>"lng,lat"</code> 坐标，或配置高德 key。</div>
+    </details>
+    <details>
+      <summary>路线卡片没出现地图？</summary>
+      <div class="body">卡片会依次尝试：真地图 → 自绘示意图 → 文本行。看不到地图通常是①未配 key ②高德配额超限 ③不在 Web 客户端。此时仍会有自绘示意图或文本结果，不是失败。</div>
+    </details>
+    <details>
+      <summary>卡片画的是另一条路线，和正文对不上？</summary>
+      <div class="body">见「已知限制」第 1 条 —— 卡片只镜像本回合的路线调用。让模型在本回合用相同起终点再算一次即可；工具的描述已内置这条契约。</div>
+    </details>
+    <details>
+      <summary>卡片会消耗 token 吗？</summary>
+      <div class="body">不会。卡片数据走 <code>presentationMeta</code> 持久化，不进入模型上下文。</div>
+    </details>
+    <details>
+      <summary>需要装 MCP 服务器吗？</summary>
+      <div class="body">不需要。7 个工具都是 DSH 原生工具，走 <code>ctx.tools</code> 注册。</div>
+    </details>
+    <details>
+      <summary>支持哪些 DSH 版本？</summary>
+      <div class="body">DSH ≥ 0.1.2-rc.1；已在 0.1.6-alpha.2 与 0.1.6-alpha.1 实测。回合尾部槽位语义在这两版之间变过，插件按槽位声明自适应，无需换版本。</div>
+    </details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fbrand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0F1728"/><path d="M7 23 C 11 17, 13.5 21, 18 14 S 23.5 10.5, 25 9" fill="none" stroke="#3D7EFF" stroke-width="2.2" stroke-linecap="round"/><circle cx="7" cy="23" r="2.6" fill="#2ED3B7"/><circle cx="25" cy="9" r="3" fill="#C8402F"/></svg>
+      dsh-map-tools <span class="ver">0.7.1</span>
+    </div>
+    <ul class="flinks">
+      <li><a href="https://github.com/HorusJiang/dsh-map-tools" target="_blank" rel="noopener">GitHub 仓库</a></li>
+      <li><a href="https://www.npmjs.com/package/dsh-map-tools" target="_blank" rel="noopener">npm 包</a></li>
+      <li><a href="https://github.com/HorusJiang/dsh-map-tools/blob/master/CHANGELOG.md" target="_blank" rel="noopener">更新日志</a></li>
+      <li><a href="https://console.amap.com/dev/key/app" target="_blank" rel="noopener">申请高德 Key</a></li>
+      <li><a href="https://github.com/HorusJiang/dsh-map-tools/issues" target="_blank" rel="noopener">反馈 Issue</a></li>
+      <li><a href="https://github.com/HorusJiang/dsh-map-tools/blob/master/LICENSE" target="_blank" rel="noopener">MIT 许可</a></li>
+    </ul>
+    <p class="fine">为 <a href="https://github.com/deepseek-ai/deepseek-harness" target="_blank" rel="noopener">DeepSeek Harness</a> 而生的地图与路径规划原生工具。<br>MIT © HorusJiang · 本页零依赖、无外部请求，与你本地的插件一样。</p>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var buttons = document.querySelectorAll('[data-copy]')
+  Array.prototype.forEach.call(buttons, function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-copy')
+      var label = btn.textContent
+      function done() {
+        btn.textContent = '已复制'
+        btn.classList.add('ok')
+        setTimeout(function () { btn.textContent = label; btn.classList.remove('ok') }, 1600)
+      }
+      function fallback() {
+        var ta = document.createElement('textarea')
+        ta.value = text
+        ta.setAttribute('readonly', '')
+        ta.style.position = 'fixed'
+        ta.style.top = '-1000px'
+        document.body.appendChild(ta)
+        ta.select()
+        try { document.execCommand('copy'); done() } catch (e) { /* clipboard unavailable */ }
+        document.body.removeChild(ta)
+      }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done, fallback)
+      } else { fallback() }
+    })
+  })
+
+  var links = Array.prototype.slice.call(document.querySelectorAll('.nav-links a'))
+  var byId = {}
+  links.forEach(function (a) {
+    var id = a.getAttribute('href').slice(1)
+    var el = document.getElementById(id)
+    if (el) byId[id] = a
+  })
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var a = byId[entry.target.id]
+        if (!a || !entry.isIntersecting) return
+        links.forEach(function (l) { l.classList.remove('active') })
+        a.classList.add('active')
+      })
+    }, { rootMargin: '-45% 0px -50% 0px' })
+    Object.keys(byId).forEach(function (id) { observer.observe(document.getElementById(id)) })
+  }
+})()
+</script>
+</body>
+</html>
