@@ -106,11 +106,11 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 
 ```sh
 dsh plugin --profile web list                        # 查看已装版本
-dsh plugin --profile web add dsh-map-tools@^0.6.0    # 升级
+dsh plugin --profile web add dsh-map-tools@^0.7.0    # 升级
 dsh plugin --profile web remove dsh-map-tools        # 卸载
 ```
 
-> **0.x 的坑**：`^0.5.1` 这类 caret 在 0.x 阶段只允许同 minor，**装不到 0.6.0**。升级时请写明目标版本（如 `dsh-map-tools@^0.6.0`）。
+> **0.x 的坑**：`^0.6.1` 这类 caret 在 0.x 阶段只允许同 minor，**装不到 0.7.x**。升级时请写明目标版本（如 `dsh-map-tools@^0.7.0`）。
 
 ### 本地开发安装
 

@@ -105,11 +105,11 @@ Restart `dsh web` after installing (press `R` in the launcher), then use the `ma
 
 ```sh
 dsh plugin --profile web list                        # installed version
-dsh plugin --profile web add dsh-map-tools@^0.6.0    # upgrade
+dsh plugin --profile web add dsh-map-tools@^0.7.0    # upgrade
 dsh plugin --profile web remove dsh-map-tools        # uninstall
 ```
 
-> **The 0.x caret trap**: on 0.x, a caret like `^0.5.1` only allows the same minor, so it **cannot** resolve 0.6.0. Name the target version when upgrading (e.g. `dsh-map-tools@^0.6.0`).
+> **The 0.x caret trap**: on 0.x, a caret like `^0.6.1` only allows the same minor, so it **cannot** resolve 0.7.x. Name the target version when upgrading (e.g. `dsh-map-tools@^0.7.0`).
 
 ### Local development install
 
