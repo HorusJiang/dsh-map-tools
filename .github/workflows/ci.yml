@@ -24,14 +24,14 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         node: ['22']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # pnpm first: setup-node's `cache: pnpm` needs the store path it defines.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
           cache: pnpm
@@ -67,13 +67,13 @@ jobs:
     name: node 20 · the built artifact
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: pnpm
@@ -87,7 +87,7 @@ jobs:
       # Switch to the floor version only after the toolchain has done its work:
       # pnpm 11 is not guaranteed to run on Node 20, and this job is about the
       # artifact, not about pnpm.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
 
