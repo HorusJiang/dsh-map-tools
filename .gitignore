@@ -45,6 +45,9 @@ Thumbs.db
 # Local session handoff (not for public repo)
 PROJECT-SNAPSHOT.md
 
+# Agent 工作区记忆（本地笔记，不进公开仓库）
+.workbuddy/
+
 # 内部材料：只留在本地，不进公开仓库（曾误提交，已从索引移除）
 PLAN.md
 RELEASE-STATUS.md
