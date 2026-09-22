@@ -342,10 +342,17 @@ Full conventions: [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
 ## Publishing
 
 ```sh
-npm config set registry https://registry.npmjs.org/
-npm login                     # npm account (a bypass-2FA publish token is recommended)
-node scripts/publish.mjs      # one shot: auth check → build → pack check → publish → verify
+npm login                     # npm account (npm >= 11.15.0 for the two-step flow)
+node scripts/publish.mjs      # one shot: auth → build → test → pack check → publish → verify installability
+node scripts/publish.mjs --stage          # two-step: stage only, then a maintainer approves with 2FA
+node scripts/publish.mjs --verify-only    # verify one version is genuinely installable (sha1 compared)
+git tag -a vX.Y.Z -m "dsh-map-tools X.Y.Z" && git push origin vX.Y.Z
 ```
+
+How npm behaves now (the "bypass-2FA publish token" advice in older docs is obsolete):
+
+- With 2FA enabled, npm offers **staged publishing**: `npm stage publish` only hands the version to the registry — the metadata is visible but the **tarball is not public, so nobody can install it** until a maintainer approves with 2FA (`npm stage list dsh-map-tools` → `npm stage approve <stage-id>`, or the Staged Packages tab on npmjs.com). This repo has no CI yet, so `--stage` is the **local equivalent of dsh-jev-tools' CI flow** (a trusted publisher configured stage-only).
+- **"Published" is not "installable"**: the full packument, the corgi packument used by installs, and the tarball propagate as three independent caches (plus npm's own local HTTP cache). The script therefore has exactly one criterion: fetch the tarball with a **fresh cache and `--prefer-online`**, and compare its sha1 with the local build. The website's Published badge and `npm view` both propagate earlier than the tarball, so neither counts as evidence.
 
 Versioning follows [SemVer](https://semver.org/); changes are tracked in [CHANGELOG.md](CHANGELOG.md). The published package contains only `lib/`, `client/`, `cordis.patch.yml` and `LICENSE` (plus the `package.json` / READMEs npm always ships).
 

@@ -343,10 +343,17 @@ pnpm hooks                            # 安装 pre-commit 密钥守卫
 ## 发布
 
 ```sh
-npm config set registry https://registry.npmjs.org/
-npm login                     # npm 账号（建议配置 bypass-2FA 的发布 token）
-node scripts/publish.mjs      # 一键：校验登录 → 构建 → 打包检查 → 发布 → 验证
+npm login                     # npm 账号（本机 npm 需 ≥ 11.15.0 才能用两段式发布）
+node scripts/publish.mjs      # 一键：校验登录 → 构建 → 测试 → 打包检查 → 发布 → 验证可安装
+node scripts/publish.mjs --stage          # 两段式：只 staging，等维护者 2FA 批准
+node scripts/publish.mjs --verify-only    # 只验证某个版本"真的能装上"（含 sha1 对照）
+git tag -a vX.Y.Z -m "dsh-map-tools X.Y.Z" && git push origin vX.Y.Z
 ```
+
+关于 npm 现在的行为（旧文档里的"bypass-2FA 发布 token"已经过时）：
+
+- 账号开启 2FA 后，npm 有 **staged publishing**：`npm stage publish` 只把版本交给 registry——元数据可见，但 **tarball 不公开、谁都装不到**，必须由维护者用 2FA 批准（`npm stage list dsh-map-tools` → `npm stage approve <stage-id>`，或 npmjs.com 的 Staged Packages 页）。本仓库还没搭 CI，`--stage` 是 **dsh-jev-tools 的 CI（trusted publisher 配成 stage-only）那套流程的本地等价物**。
+- **"发布成功"不等于"能装"**：完整 packument、安装用的 corgi packument、tarball 是三份独立传播的缓存（npm 自己还有本地 HTTP 缓存）。所以脚本的验证判据只有一个：用**全新缓存 + `--prefer-online` 真把 tarball 拉下来**，并与本地构建产物的 sha1 对照——网站上的 Published 和 `npm view` 都比 tarball 传播得早，不能当判据。
 
 版本语义遵循 [SemVer](https://semver.org/lang/zh-CN/)，变更记录见 [CHANGELOG.md](CHANGELOG.md)。发布包只含 `lib/`、`client/`、`cordis.patch.yml` 与 `LICENSE`（外加 npm 必带的 `package.json` / README）。
 

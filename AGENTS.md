@@ -83,7 +83,9 @@ node scripts/smoke.mjs   # 7 工具注册检查
 1. 更新 `CHANGELOG.md`（版本号 + 变更分类 Added/Fixed/Changed/Removed）。
 2. 按 SemVer 提升 `package.json` 版本。
 3. `pnpm run build && pnpm test` 全绿。
-4. `node scripts/publish.mjs`（需 npm 已登录；建议 bypass-2FA 发布 token）。
+4. `node scripts/publish.mjs`（需 npm 已登录）。脚本自己跑构建 + 测试 + 打包检查闸门，发布后**用全新缓存 + `--prefer-online` 把 tarball 真拉下来**、并与本地构建产物对照 sha1 才算成功——网站上的 `Published` 和 `npm view` 都比 tarball 传播得早，**不能**当"能装上"的判据。
+   - 两段式发布（对齐 dsh-jev-tools CI 的 stage-only 模型，npm ≥ 11.15.0）：`node scripts/publish.mjs --stage`，然后由维护者用 2FA 批准 —— `npm stage list dsh-map-tools` → `npm stage approve <stage-id>`，或 npmjs.com 的 Staged Packages 页。
+   - 批准后/事后核对：`node scripts/publish.mjs --verify-only`。
 5. 推送 git + 打 tag（可选但推荐）。
 
 ## 提交信息规范

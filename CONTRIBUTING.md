@@ -65,7 +65,9 @@ node scripts/config-e2e.mjs   # 配置读写回环
 
 ## 发布
 
-由维护者执行：更新 CHANGELOG → SemVer 提版本 → `node scripts/publish.mjs` → 推送 + tag。详见 [AGENTS.md](AGENTS.md)。
+由维护者执行：更新 CHANGELOG → SemVer 提版本 → `node scripts/publish.mjs`（脚本自己跑构建 + 测试 + 打包检查闸门，发布后用全新缓存拉 tarball 校验 sha1）→ 推送 + tag。
+
+两段式发布（对齐 dsh-jev-tools CI 的 stage-only 模型，npm ≥ 11.15.0）：`node scripts/publish.mjs --stage` → 维护者用 2FA 批准（`npm stage approve <stage-id>`，或 npmjs.com → Staged Packages）→ `node scripts/publish.mjs --verify-only` 复核。详见 [AGENTS.md](AGENTS.md)。
 
 ## 许可
 
