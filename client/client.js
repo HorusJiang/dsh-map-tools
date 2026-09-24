@@ -507,10 +507,15 @@ window.__ModuleLoader__.load({
       map_bicycling_route: { mode: 'ride', label: '骑行' },
     }
 
-    var CARD_BG = 'var(--dsw-alias-bg-elevated, rgba(127,127,127,0.06))'
-    var CARD_BORDER = 'var(--dsw-alias-border, rgba(127,127,127,0.2))'
+    // 这一区的主题名同样必须**真实存在**：卡片底色 / 描边 / 链接色一度用的是
+    // 宿主里根本没有的别名，于是三者全部静默落到硬编码 fallback，深浅色不跟随。
+    // 配置卡那一份在 0.7.0 修过，这里是同一批名字的漏网。下面每个名字都对运行中的
+    // ui-theme 令牌表逐个复核过（DeepSeek Harness Desktop 0.1.7-rc.2）。
+    var TEXT = 'var(--dsw-alias-label-primary, inherit)'
+    var CARD_BG = 'var(--dsw-alias-bg-layer-1, rgba(127,127,127,0.06))'
+    var CARD_BORDER = 'var(--dsw-alias-border-l2, rgba(127,127,127,0.2))'
     var MUTED = 'var(--dsw-alias-label-secondary, rgba(127,127,127,0.9))'
-    var ACCENT = 'var(--dsw-alias-accent, #4f8cff)'
+    var ACCENT = 'var(--dsw-alias-link, #4f8cff)'
     var START_COLOR = '#22a06b'
     var END_COLOR = '#e05c5c'
     var MAP_BG = 'rgba(127,127,127,0.10)'
@@ -1007,7 +1012,7 @@ window.__ModuleLoader__.load({
             whiteSpace: 'pre-wrap',
             borderRadius: '6px',
             background: 'rgba(127,127,127,0.08)',
-            fontSize: '11.5px',
+            fontSize: '12px',
             lineHeight: '1.5',
             color: MUTED,
           },
@@ -1024,22 +1029,46 @@ window.__ModuleLoader__.load({
               borderRadius: '5px',
               background: 'none',
               color: MUTED,
-              fontSize: '11.5px',
+              fontSize: '12px',
               cursor: 'pointer',
             },
           }, expanded ? '收起分段指引' : '展开分段指引（还有 ' + hiddenCount + ' 行）'))
         }
       }
 
+      // 署名与「在高德打开 ↗」**同一行**：它接在深链后面，而不是另起一行压在卡片
+      // 底部，所以两者共用一个 flex 行、按基线对齐（窄卡片上再换行）。
       var uri = amapUri(model.mode, model.line, model.fromText, model.toText)
-      if (uri) {
-        rows.push(h('div', { key: 'link', style: { marginTop: '8px' } },
-          h('a', {
+      var withCredit = !!(opts && opts.credit === true)
+      if (uri || withCredit) {
+        var linkRow = []
+        if (uri) {
+          // 字号不在这里定：整行统一 12px（与上面的统计行同号），深链只负责颜色，
+          // 否则深链 12px、署名继承外层更大的字号，同一行会明显不等大。
+          linkRow.push(h('a', {
+            key: 'amap',
             href: uri,
             target: '_blank',
             rel: 'noreferrer',
-            style: { color: ACCENT, fontSize: '12px', textDecoration: 'none' },
-          }, '在高德打开 ↗')))
+            style: { color: ACCENT, textDecoration: 'none' },
+          }, '在高德打开 ↗'))
+        }
+        // 没有几何（老日志 / 高德公交无折线）时深链是空的，署名照样在。
+        if (withCredit) linkRow = linkRow.concat(creditNodes(h))
+        rows.push(h('div', {
+          key: 'link',
+          style: {
+            marginTop: '8px',
+            display: 'flex',
+            alignItems: 'baseline',
+            flexWrap: 'wrap',
+            gap: '8px',
+            // 这一行的唯一字号来源：深链与署名同号，差别只在颜色 / 字重。
+            fontSize: '12px',
+            lineHeight: '18px',
+            color: MUTED,
+          },
+        }, linkRow))
       }
       return rows
     }
@@ -1261,6 +1290,40 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /** 插件仓库：署名行给截图读者的唯一去处。 */
+    var REPO_URL = 'https://github.com/HorusJiang/dsh-map-tools'
+
+    /**
+     * 署名内容（包名 + GitHub 链接）：接在「在高德打开 ↗」**同一行的后面**。
+     *
+     * 存在的理由只有**截图传播**：地图卡会被截图、转发到聊天和朋友圈里，而那一张
+     * 图里没有 README、没有 npm 页——只有这行字能说明"这张地图卡是 dsh-map-tools
+     * 画的、它是个 DSH 插件"。所以包名用正文色 + 中等字重（缩略图里也认得出），
+     * 其余收敛成次要色——**字号由所在行统一给**（与「在高德打开 ↗」同号 12px），
+     * 这里绝不自带 fontSize，否则同一行里两截会不等大。
+     *
+     * 纯客户端渲染，宿主半边没有一行改动：不进 `presentationMeta`、不进模型上下文、
+     * 不占 token，也不参与回合尾部席位的单选语义。
+     *
+     * @param h - createElement。
+     * @returns 该行的内容节点数组（调用方把它接在深链后面）。
+     */
+    function creditNodes(h) {
+      return [
+        h('span', { key: 'credit' },
+          '本卡片由 DeepSeek Harness 插件 ',
+          h('span', { key: 'name', style: { color: TEXT, fontWeight: 500 } }, BUNDLE),
+          ' 生成'),
+        h('a', {
+          key: 'repo',
+          href: REPO_URL,
+          target: '_blank',
+          rel: 'noreferrer',
+          style: { color: ACCENT, textDecoration: 'none' },
+        }, 'GitHub ↗'),
+      ]
+    }
+
     /**
      * 回合尾部的路线卡片：本轮算了几条就逐条画（每条一张地图），
      * 与工具卡片复用同一套 body 与降级逻辑。
@@ -1291,12 +1354,14 @@ window.__ModuleLoader__.load({
           key: 'head' + k,
           style: { fontSize: '12px', color: MUTED, marginBottom: '6px' },
         }, head.join(' · ')))
-        children.push(h('div', { key: 'body' + k }, RouteBody(h, models[k])))
+        // 署名只接在**最后一条路线**的「在高德打开 ↗」后面（整张卡出现一次，
+        // 不是每条路线一次）：它是给截图读者的落款，重复 N 遍只会变成噪音。
+        children.push(h('div', { key: 'body' + k }, RouteBody(h, models[k], { credit: k === models.length - 1 })))
       }
       if (card.total > MAX_TURN_ROUTES) {
         children.push(h('div', {
           key: 'more',
-          style: { marginTop: '6px', fontSize: '11.5px', color: MUTED },
+          style: { marginTop: '6px', fontSize: '12px', color: MUTED },
         }, '本轮共 ' + card.total + ' 条路线，这里显示前 ' + MAX_TURN_ROUTES + ' 条'))
       }
       if (card.displaced && card.produced > 0) {
@@ -1304,7 +1369,7 @@ window.__ModuleLoader__.load({
         // （代价），至少把数量交代清楚。列表式槽位下官方那行照常渲染，无需多言。
         children.push(h('div', {
           key: 'produced',
-          style: { marginTop: '6px', fontSize: '11.5px', color: MUTED },
+          style: { marginTop: '6px', fontSize: '12px', color: MUTED },
         }, '本轮另有 ' + card.produced + ' 个产出文件（地图卡占用此行，文件见过程区）'))
       }
       return h('div', {
@@ -1509,6 +1574,10 @@ window.__ModuleLoader__.load({
       registerTurnRouteCard: registerTurnRouteCard,
       producedFileCount: producedFileCount,
       MAX_TURN_ROUTES: MAX_TURN_ROUTES,
+      creditNodes: creditNodes,
+      REPO_URL: REPO_URL,
+      TurnRouteCard: TurnRouteCard,
+      RouteCard: RouteCard,
     }
     return module.exports
   },

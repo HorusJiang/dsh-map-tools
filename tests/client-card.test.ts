@@ -110,6 +110,10 @@ interface RouteInternals {
   registerTurnRouteCard: (ctx: unknown) => void
   producedFileCount: (owner: unknown, seq: number) => number
   MAX_TURN_ROUTES: number
+  creditNodes: (h: (type: unknown, props: unknown, ...children: unknown[]) => unknown) => unknown[]
+  REPO_URL: string
+  TurnRouteCard: (props: unknown) => unknown
+  RouteCard: (props: unknown) => unknown
   formatDistance: (meters: number) => string
   formatDuration: (seconds: number) => string
   amapUri: (mode: string, line: Array<[number, number]>, from: string, to: string) => string | null
@@ -1044,5 +1048,199 @@ describe('bundle 配置卡片（plugins.bundle.config）', () => {
     expect(end).toBeGreaterThan(start)
     const used = [...source.slice(start, end).matchAll(/var\((--dsw-[a-z0-9-]+)/g)].map((match) => match[1]!)
     expect([...new Set(used)].sort()).toEqual(verified)
+  })
+})
+
+describe('卡片的署名行（给截图传播的落款）', () => {
+  /** 极简元素树；React 替身把 children 当单个参数收，所以数组要能一层层走下去。 */
+  interface El { type?: unknown; props?: Record<string, unknown>; children?: unknown[] }
+
+  function walk(node: unknown, visit: (element: El) => void): void {
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, visit)
+      return
+    }
+    if (node === null || typeof node !== 'object') return
+    const element = node as El
+    visit(element)
+    for (const child of element.children ?? []) walk(child, visit)
+  }
+
+  function textOf(node: unknown): string {
+    if (typeof node === 'string') return node
+    if (typeof node === 'number') return String(node)
+    if (Array.isArray(node)) return node.map(textOf).join('')
+    if (node === null || typeof node !== 'object') return ''
+    return ((node as El).children ?? []).map(textOf).join('')
+  }
+
+  /** 元素的直接孩子：React 替身把整块 children 数组当**单个参数**收，所以可能是 [ [a, b] ]。 */
+  function kids(element: El): El[] {
+    const children = element.children ?? []
+    return (children.length === 1 && Array.isArray(children[0]) ? children[0] : children) as El[]
+  }
+
+  /** 卡片顶层那一行行。 */
+  function topLevel(element: El): unknown[] {
+    return kids(element)
+  }
+
+  const routeMeta = {
+    v: 1,
+    kind: 'route',
+    provider: 'amap',
+    distanceM: 36841,
+    durationS: 2662,
+    stepCount: 14,
+    alternatives: 0,
+    line: [[116.378, 39.865], [116.5, 39.99], [116.6, 40.07]],
+  }
+
+  const matchedEntry = (seq: number): unknown => ({
+    toolName: 'map_driving_route',
+    argsRaw: JSON.stringify({ origin: '北京南站', destination: '首都机场' }),
+    meta: routeMeta,
+    seq,
+  })
+
+  it('署名内容：说清是谁画的，GitHub 链接外链安全属性齐备', () => {
+    const h = (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children })
+    const nodes = route.creditNodes(h) as El[]
+    expect(nodes).toHaveLength(2)
+
+    const text = textOf(nodes)
+    expect(text).toContain('本卡片由 DeepSeek Harness 插件')
+    // 包名是这行字里唯一要"远看也认得出"的东西（截图缩略图里也能读）。
+    expect(text).toContain('dsh-map-tools')
+    expect(text).toContain('生成')
+
+    const link = nodes.find((node) => node.type === 'a')!
+    expect(textOf(link)).toBe('GitHub ↗')
+    expect(link.props!.href).toBe(route.REPO_URL)
+    expect(route.REPO_URL).toBe('https://github.com/HorusJiang/dsh-map-tools')
+    expect(link.props!.target).toBe('_blank')
+    expect(link.props!.rel).toBe('noreferrer')
+  })
+
+  it('回合尾部地图卡：署名接在最后一条「在高德打开 ↗」的**同一行**后面，整卡只出现一次', () => {
+    const card = route.TurnRouteCard({
+      matched: { routes: [matchedEntry(10), matchedEntry(20)], produced: 3 },
+    }) as El
+    const rows = topLevel(card)
+    const bodyOf = (key: string): El => rows.find((row) => (row as El).props?.key === key) as El
+
+    // 署名与深链同属一行：同一个父元素里既有 amap 又有 credit，且深链在前。
+    let linkRow: El | undefined
+    walk(card, (element) => {
+      const keys = kids(element).map((child) => child.props?.key)
+      if (keys.includes('amap') && keys.includes('credit')) linkRow = element
+    })
+    expect(linkRow).toBeTruthy()
+    expect(linkRow!.props!.key).toBe('link')
+    const linkKeys = kids(linkRow!).map((child) => child.props?.key)
+    expect(linkKeys).toEqual(['amap', 'credit', 'repo'])
+
+    // 同一行只有一个字号来源：行给 12px，深链与署名都不自带 fontSize。
+    // 回归：深链写死 12px、行不写 → 署名继承外层字号，截图里两截明显不等大。
+    const rowStyle = linkRow!.props!.style as Record<string, unknown>
+    expect(rowStyle.fontSize).toBe('12px')
+    walk(linkRow!, (element) => {
+      const size = (element.props?.style as Record<string, unknown> | undefined)?.fontSize
+      if (size !== undefined) expect(size).toBe('12px')
+    })
+
+    // 只接在**最后一条**路线后面：第一条没有署名。
+    expect(textOf(bodyOf('body1'))).toContain('dsh-map-tools')
+    expect(textOf(bodyOf('body0'))).not.toContain('dsh-map-tools')
+    // 整张卡只有一个 GitHub 链接。
+    let repos = 0
+    walk(card, (element) => { if (element.props?.href === route.REPO_URL) repos += 1 })
+    expect(repos).toBe(1)
+  })
+
+  it('超过 3 条路线时：署名接在画出来的最后一条上，「本轮共 N 条」排在它之后', () => {
+    const routes = [10, 20, 30, 40].map((seq) => matchedEntry(seq))
+    const card = route.TurnRouteCard({ matched: { routes, produced: 0 } }) as El
+    const rows = topLevel(card)
+    const last = route.MAX_TURN_ROUTES - 1
+    const bodyOf = (key: string): El => rows.find((row) => (row as El).props?.key === key) as El
+    expect(textOf(bodyOf('body' + last))).toContain('dsh-map-tools')
+    expect(textOf(bodyOf('body0'))).not.toContain('dsh-map-tools')
+    expect(rows.map((row) => (row as El).props?.key)).toContain('more')
+    let repos = 0
+    walk(card, (element) => { if (element.props?.href === route.REPO_URL) repos += 1 })
+    expect(repos).toBe(1)
+  })
+
+  it('没有几何（老日志）时没有「在高德打开」，署名照样在', () => {
+    const card = route.TurnRouteCard({
+      matched: {
+        routes: [{
+          toolName: 'map_driving_route',
+          argsRaw: JSON.stringify({ origin: '北京南站', destination: '首都机场' }),
+          meta: { ...routeMeta, line: [[116.378, 39.865]] },
+          seq: 10,
+        }],
+        produced: 0,
+      },
+    }) as El
+    const text = textOf(card)
+    expect(text).not.toContain('在高德打开')
+    expect(text).toContain('dsh-map-tools')
+    expect(text).toContain('GitHub ↗')
+  })
+
+  it('过程区的工具卡不落款（那里随思考反复重绘，重复刷屏没有意义）', () => {
+    const card = route.RouteCard({
+      toolName: 'map_driving_route',
+      block: {
+        kind: 'result',
+        isError: false,
+        call: { argsRaw: JSON.stringify({ origin: '北京南站', destination: '首都机场' }) },
+        content: [{ type: 'text', text: '高德 路线：36.8 公里' }],
+        meta: routeMeta,
+      },
+    }) as El
+    expect(textOf(card)).not.toContain('dsh-map-tools')
+    let repos = 0
+    walk(card, (element) => { if (element.props?.href === route.REPO_URL) repos += 1 })
+    expect(repos).toBe(0)
+  })
+
+  it('路线卡片区只引用运行中真实存在的主题 token', () => {
+    // 与配置卡区同一条规矩：名字不存在时 fallback 会静默生效，深浅色就不跟随了。
+    // 这一组对照运行中的 ui-theme 令牌表逐个核对过（Desktop 0.1.7-rc.2）。
+    const verified = [
+      '--dsw-alias-bg-layer-1',
+      '--dsw-alias-border-l2',
+      '--dsw-alias-label-primary',
+      '--dsw-alias-label-secondary',
+      '--dsw-alias-link',
+    ]
+    const source = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8')
+    const start = source.indexOf('// ---- 路线卡片')
+    expect(start).toBeGreaterThan(-1)
+    const used = [...source.slice(start).matchAll(/var\((--dsw-[a-z0-9-]+)/g)].map((match) => match[1]!)
+    expect([...new Set(used)].sort()).toEqual(verified)
+  })
+
+  it('路线卡片区只有一个字号 12px（同一张卡里混用半号字号就是难看的来源）', () => {
+    // 实机踩坑：内联署名那一行没定字号，深链自带 12px、署名却继承外层更大的字号，
+    // 同一行两截明显不等大。字号现在只有"行"这一个来源，且全卡统一。
+    const source = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8')
+    const start = source.indexOf('// ---- 路线卡片')
+    expect(start).toBeGreaterThan(-1)
+    const sizes = [...source.slice(start).matchAll(/fontSize: '([0-9.]+)px'/g)].map((match) => match[1]!)
+    expect(sizes.length).toBeGreaterThan(0)
+    expect([...new Set(sizes)]).toEqual(['12'])
+  })
+
+  it('不再引用宿主里不存在的三个别名（曾静默落到 fallback、深浅色不跟随）', () => {
+    const source = readFileSync(new URL('../client/client.js', import.meta.url), 'utf8')
+    expect(source).not.toContain('var(--dsw-alias-accent')
+    expect(source).not.toContain('var(--dsw-alias-bg-elevated')
+    // `--dsw-alias-border` 只能以真实变体出现（-l1 / -l2 / -l4 / -inverted…），
+    // 光秃秃的 `var(--dsw-alias-border,` / `var(--dsw-alias-border)` 就是那个假名字。
+    expect(source).not.toMatch(/var\(--dsw-alias-border[,)]/)
   })
 })

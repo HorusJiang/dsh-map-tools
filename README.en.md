@@ -76,15 +76,30 @@ Four card states — none of them blank:
 
 > The turn tail is a **single-winner** seat in the DSH client: when the turn has routes, the map card takes that row and the official "files produced this turn" row does not render — the card notes "N other files produced this turn (the map card occupies this row; see the process area)".
 
+The card's **credit** sits on the **same line, right after** the "Open in Amap ↗" link (`本卡片由 DeepSeek Harness 插件 dsh-map-tools 生成 · GitHub ↗`; once per card, attached to the last route): these cards get screenshotted and forwarded, and a screenshot carries no README and no package page — that line is the only thing in it that says who drew the map. It is rendered by the browser half only: it never enters the model context and costs no tokens.
+
 ## Install
 
-### Option 1 — npm (recommended, prebuilt)
+### Option 1 — DeepSeek Harness Desktop plugin page (recommended)
+
+Desktop's **plugin manager** installs by package name; no CLI needed:
+
+1. Open the **Plugins** page in the sidebar → **Add plugin** (top right).
+2. Put `dsh-map-tools` in **Package name or address**; leave **Registry** on its default (or pick the **Mainland China mirror** on a slow network).
+3. The page looks the package up on that npm registry and shows its name and version — confirm, then press **Install**. You may press **Enable now**; otherwise the notice says the change applies at the next start.
+4. Restart DeepSeek Harness Desktop and the `map_*` tools are available in a session.
+
+> **Which profile it lands in**: the desktop app installs into the **`desktop`** profile (`~/.dsh/profiles/desktop`) and records a caret range such as `dsh-map-tools ^0.7.1` — on 0.x a caret **cannot** reach 0.8.x, so upgrade by entering the target version (shaped `dsh-map-tools@^0.8.0`, with `0.8` replaced by the minor you are moving to) in the same field.
+> That field also accepts a **GitHub address** (`https://github.com/HorusJiang/dsh-map-tools`) and the **absolute path of a local plugin directory**, so source and local-development installs go through the same dialog.
+
+### Option 2 — npm (CLI, prebuilt)
 
 ```sh
-dsh plugin --profile web add dsh-map-tools
+dsh plugin --profile web add dsh-map-tools        # web / CLI
+dsh plugin --profile desktop add dsh-map-tools    # desktop app (profile name: desktop)
 ```
 
-### Option 2 — from GitHub (source build)
+### Option 3 — from GitHub (source build)
 
 ```sh
 dsh plugin --profile web add github:HorusJiang/dsh-map-tools
@@ -95,11 +110,12 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 **Requirements**
 
 - **DeepSeek Harness ≥ 0.1.2-rc.1** (peer deps: `@deepseek-ai/dsh-settings`, `@deepseek-ai/dsh-tools`, `@deepseek-ai/cordis` ^4.0.2). Earlier release lines are unsupported because `@deepseek-ai/dsh-settings` removed its legacy API.
-- Verified end to end on **DSH 0.1.5-rc.1 + Node v24**; the compatible releases are recorded in `package.json` under `dsh.compatibility.dshReleases`.
+- Verified end to end on **DSH 0.1.6-alpha.2 / 0.1.6-alpha.1 + Node v24**; the compatible releases are recorded in `package.json` under `dsh.compatibility.dshReleases`.
+- **The desktop app works too**: on **DeepSeek Harness Desktop (DSH 0.1.7-rc.2)** the plugin-page install (`desktop` profile) and the turn-tail map card both work — that release still declares `conversation.chat.turnTail` as `list`, which is the shape this plugin registers.
 - **Node ≥ 20**.
-- The route map card and the config page need the **web profile** (`dsh.client.platform: web`). On TUI / headless the 7 tools still work — there are simply no graphical cards.
+- The route map card and the config page need a **web client** (`dsh.client.platform: web`: both `dsh web` and DeepSeek Harness Desktop qualify). On TUI / headless the 7 tools still work — there are simply no graphical cards.
 
-Restart `dsh web` after installing (press `R` in the launcher), then use the `map_*` tools in a session.
+Restart the client after installing: `dsh web` for the CLI (press `R` in the launcher), or DeepSeek Harness Desktop for the desktop app.
 
 ### Upgrade / uninstall / inspect
 
@@ -109,7 +125,9 @@ dsh plugin --profile web add dsh-map-tools@^0.7.0    # upgrade
 dsh plugin --profile web remove dsh-map-tools        # uninstall
 ```
 
-> **The 0.x caret trap**: on 0.x, a caret like `^0.6.1` only allows the same minor, so it **cannot** resolve 0.7.x. Name the target version when upgrading (e.g. `dsh-map-tools@^0.7.0`).
+On the desktop app the whole thing is in the UI: **Plugins** page → dsh-map-tools gives you the switch and **Uninstall**; **upgrading means re-installing with a named target version** (e.g. `dsh-map-tools@^0.8.0`), because the `^0.7.1` the page writes cannot reach 0.8.x on 0.x.
+
+> **The 0.x caret trap**: on 0.x, a caret like `^0.6.1` only allows the same minor, so it **cannot** resolve 0.7.x. Name the target version when upgrading (e.g. `dsh-map-tools@^0.7.0`) — the plugin-page install (Option 1) obeys the same rule.
 
 ### Local development install
 
@@ -313,7 +331,10 @@ A: No. Card data travels through `presentationMeta` and never enters the model c
 A: No. All 7 tools are native DSH tools.
 
 **Q: Which DSH versions are supported?**
-A: DSH ≥ 0.1.2-rc.1, verified on 0.1.5-rc.1. See [Install](#install).
+A: DSH ≥ 0.1.2-rc.1, verified on 0.1.6-alpha.2 and 0.1.6-alpha.1 (the turn-tail seat changed shape between those two releases; the plugin adapts to the declared slot), and it also works on **DeepSeek Harness Desktop 0.1.7-rc.2**. See [Install](#install).
+
+**Q: How do I install or upgrade it on DeepSeek Harness Desktop?**
+A: No CLI needed: **Plugins** page → **Add plugin**, enter `dsh-map-tools`. To upgrade, enter `dsh-map-tools@^0.8.0` in the same field — the `^0.7.1` the page wrote cannot reach 0.8.x on 0.x. It installs into the `desktop` profile; see [Install](#install) Option 1.
 
 ## Development
 

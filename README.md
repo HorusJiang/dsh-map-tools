@@ -76,15 +76,30 @@
 
 > 回合尾部是 DSH 客户端的**单选**席位：本轮有路线时地图卡占用这一行，官方的「本轮产出文件」行本轮不渲染——卡片里会注明「本轮另有 N 个产出文件（地图卡占用此行，文件见过程区）」。
 
+卡片上的**署名**接在「在高德打开 ↗」**同一行的后面**（`本卡片由 DeepSeek Harness 插件 dsh-map-tools 生成 · GitHub ↗`；整卡只出现一次，挂在最后一条路线上）：地图卡经常被截图转发，而那张图里没有 README、也没有包页——这行字是图里唯一能说明"它是谁画的"的信息。它由浏览器半边直接渲染，不进模型上下文、不占 token。
+
 ## 安装
 
-### 方式一：从 npm 安装（推荐，预构建）
+### 方式一：桌面版插件页安装（DeepSeek Harness Desktop，推荐）
+
+桌面版的**插件管理界面**可以直接按包名安装，不必碰命令行：
+
+1. 侧边栏打开 **「插件」页** → 右上角 **「添加插件」**。
+2. 在 **「包名或地址」** 里填 `dsh-map-tools`；右侧 **「安装源」** 用默认即可（国内网络可切 **「中国大陆镜像源」**）。
+3. 界面会去该 npm 源**查询这个包**并显示名称与版本，确认无误后点 **「安装」**；结束时可以点 **「立即启用」**，否则按提示 **「更改将在下次启动生效」**。
+4. 重启 DeepSeek Harness Desktop，在会话里即可使用 `map_*` 工具。
+
+> **它装到哪个 profile**：桌面版写进 **`desktop`** profile（`~/.dsh/profiles/desktop`），依赖会写成 `dsh-map-tools ^0.7.1` 这样的 caret 区间——**0.x 下 caret 不会升到 0.8.x**，升级时在同一个输入框里填目标版本（形如 `dsh-map-tools@^0.8.0`，`0.8` 换成你要升到的那条 minor）重新安装即可。
+> 同一个输入框也接受 **GitHub 地址**（`https://github.com/HorusJiang/dsh-map-tools`）与 **本机插件目录的绝对路径**，源码安装 / 本地开发都能走这个界面。
+
+### 方式二：从 npm 安装（命令行，预构建）
 
 ```sh
-dsh plugin --profile web add dsh-map-tools
+dsh plugin --profile web add dsh-map-tools        # Web / CLI 版
+dsh plugin --profile desktop add dsh-map-tools    # 桌面版（profile 名 desktop）
 ```
 
-### 方式二：从 GitHub 安装（源码构建）
+### 方式三：从 GitHub 安装（源码构建）
 
 ```sh
 dsh plugin --profile web add github:HorusJiang/dsh-map-tools
@@ -96,11 +111,12 @@ dsh plugin --profile web add github:HorusJiang/dsh-map-tools
 
 - **DeepSeek Harness ≥ 0.1.2-rc.1**（peer 依赖：`@deepseek-ai/dsh-settings`、`@deepseek-ai/dsh-tools`、`@deepseek-ai/cordis` ^4.0.2）。更早的发布线因 `@deepseek-ai/dsh-settings` 移除旧 API 而不再支持。
 - 已在 **DSH 0.1.6-alpha.2 / 0.1.6-alpha.1 + Node v24** 实测全部功能；已兼容版本记录在 `package.json` 的 `dsh.compatibility.dshReleases`。
+- **桌面版同样可用**：**DeepSeek Harness Desktop（DSH 0.1.7-rc.2）** 上，插件页安装（`desktop` profile）与回合尾部的地图卡片都正常工作——该版本的 `conversation.chat.turnTail` 仍声明为 `list`，与插件注册的形状一致。
 - **插件不写死宿主版本号**：客户端卡片按**槽位实际声明**适配。`conversation.chat.turnTail` 在 0.1.6-alpha.2 由链式（`chain`，要 `select`）改成列表式（`list`，要 `id`），插件运行时读 `slots.spec()` 决定注册形状，因此同一份构建在两条发布线上都能让回合尾部的路线卡片正常出现（详见 [docs/dsh-map-tools-0.1.6兼容性说明.md](docs/dsh-map-tools-0.1.6兼容性说明.md)）。
 - **Node ≥ 20**。
-- 路线地图卡与配置页需要 **web profile**（`dsh.client.platform: web`）。TUI / headless 下 7 个工具照常可用，只是没有图形卡片。
+- 路线地图卡与配置页需要 **Web 客户端**（`dsh.client.platform: web`：`dsh web` 与 DeepSeek Harness Desktop 都属于这一类）。TUI / headless 下 7 个工具照常可用，只是没有图形卡片。
 
-安装后**重启 `dsh web`**（或在启动器里按 `R`），在会话中即可使用 `map_*` 工具。
+安装后**重启客户端**：命令行版重启 `dsh web`（或在启动器里按 `R`），桌面版重启 DeepSeek Harness Desktop。之后在会话中即可使用 `map_*` 工具。
 
 ### 升级 / 卸载 / 查看
 
@@ -110,7 +126,9 @@ dsh plugin --profile web add dsh-map-tools@^0.7.0    # 升级
 dsh plugin --profile web remove dsh-map-tools        # 卸载
 ```
 
-> **0.x 的坑**：`^0.6.1` 这类 caret 在 0.x 阶段只允许同 minor，**装不到 0.7.x**。升级时请写明目标版本（如 `dsh-map-tools@^0.7.0`）。
+桌面版可以完全在界面上做完：**「插件」页 → dsh-map-tools** 里有开关与 **「卸载」**；**升级＝在「添加插件」里填目标版本重新安装**（形如 `dsh-map-tools@^0.8.0`），因为界面写下的 `^0.7.1` 在 0.x 下不会自己升到 0.8.x。
+
+> **0.x 的坑**：`^0.6.1` 这类 caret 在 0.x 阶段只允许同 minor，**装不到 0.7.x**。升级时请写明目标版本（如 `dsh-map-tools@^0.7.0`）——界面安装（方式一）同样适用这一条。
 
 ### 本地开发安装
 
@@ -314,7 +332,10 @@ A：不会。卡片数据走 `presentationMeta` 持久化，不进入模型上�
 A：不需要。7 个工具都是 DSH 原生工具。
 
 **Q：支持哪些 DSH 版本？**
-A：DSH ≥ 0.1.2-rc.1；已在 0.1.6-alpha.2 与 0.1.6-alpha.1 实测（回合尾部槽位语义在这两版之间变过，插件按槽位声明自适应，无需换版本）。详见[安装](#安装)。
+A：DSH ≥ 0.1.2-rc.1；已在 0.1.6-alpha.2 与 0.1.6-alpha.1 实测（回合尾部槽位语义在这两版之间变过，插件按槽位声明自适应，无需换版本），桌面版 **DeepSeek Harness Desktop 0.1.7-rc.2** 同样可用。详见[安装](#安装)。
+
+**Q：桌面版（DeepSeek Harness Desktop）怎么装、怎么升级？**
+A：不用命令行：侧边栏**「插件」页 → 「添加插件」**里填包名 `dsh-map-tools` 即可（界面会去 npm 源查询这个包）；升级就在同一处填目标版本（形如 `dsh-map-tools@^0.8.0`）重新安装——界面写下的 `^0.7.1` 在 0.x 下不会自己升到 0.8.x。安装落在 `desktop` profile，细节见[安装](#安装)方式一。
 
 ## 开发
 
