@@ -58,3 +58,9 @@ docs/**
 !docs/awesome-dsh-plugin-submission.yml
 !docs/dsh-map-tools-v0.1.3兼容性说明.md
 !docs/开发-热插拔-HMR.md
+
+# 临时工作目录：截图脚本、无头浏览器 profile、打包对照等一次性产物。
+# 这些从来不属于仓库，而 `git add -A` 会把它们一起扫进去——2026-09-30 就发生过一次
+# （.tmp-redesign/ 里的 Chrome profile 一次带了 717 个文件进提交，靠 `git reset --soft`
+# 就地撤回）。dsh-jev-tools 的 .gitignore 早有这条（`.tmp*`），这里补齐。
+.tmp*
