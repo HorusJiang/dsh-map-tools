@@ -40,13 +40,9 @@ header{padding:22px 0}
 /* banner */
 .banner{margin:0}
 .banner img{width:100%;height:auto}
-.banner figcaption{width:min(100% - 48px,960px);margin:14px auto 0;font-size:12.5px;color:var(--ink-3);text-align:right}
-.banner figcaption a{border-bottom:1px solid var(--line)}
-.banner figcaption a:hover{color:var(--seal);border-color:var(--seal)}
 
 /* lede */
-.lede{padding:56px 0 8px}
-.eyebrow{font-family:var(--serif);font-size:14px;letter-spacing:.34em;color:var(--gold);margin:0 0 18px}
+.lede{padding:52px 0 8px}
 h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5.6vw,50px);line-height:1.24;letter-spacing:.01em;margin:0}
 .lede p.lead{margin:20px 0 0;max-width:44em;color:var(--ink-2);font-size:16.5px}
 .cmd{margin:32px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;max-width:100%}
@@ -84,11 +80,10 @@ footer{margin-top:72px;padding:26px 0 40px;border-top:1px solid var(--line)}
 .foot .links a:hover{color:var(--seal)}
 
 @media (max-width:640px){
-  .wrap,.banner figcaption{width:calc(100% - 36px)}
+  .wrap{width:calc(100% - 36px)}
   .nav{gap:14px}
   .nav .en{display:none}
-  .eyebrow{letter-spacing:.2em;font-size:13px}
-  .lede{padding:38px 0 0}
+  .lede{padding:36px 0 0}
   .three li{grid-template-columns:22px 1fr;gap:14px}
   .foot .links{margin-left:0;width:100%}
 }
@@ -109,12 +104,10 @@ footer{margin-top:72px;padding:26px 0 40px;border-top:1px solid var(--line)}
 
 <figure class="banner" id="top">
   <img src="assets/banner.svg" width="1200" height="400" alt="dsh-map-tools —— 太平湖远山，湖山千里 · 一径相通">
-  <figcaption>湖山千里 · 一径相通 —— <a href="https://github.com/HorusJiang/dsh-map-tools/blob/master/assets/banner.svg">banner 原图</a></figcaption>
 </figure>
 
 <section class="lede">
   <div class="wrap">
-    <p class="eyebrow">地图与路径规划 · DeepSeek Harness</p>
     <h1>路线，画在回答里。</h1>
     <p class="lead">给 DeepSeek Harness 的原生地图工具。模型直接调用，不需要 MCP、不需要额外的服务；算完的路线会变成一张真地图卡片，落在回答的下方。</p>
     <div class="cmd">
