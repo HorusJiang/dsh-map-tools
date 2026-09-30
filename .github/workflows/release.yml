@@ -99,13 +99,32 @@ jobs:
       - name: The tarball carries nothing local
         run: node scripts/check-tarball.mjs
 
+      # A version that is already public must not fail the run: npm refuses a second
+      # staging of the same version, and the tag itself is still the truth ("this is
+      # the release commit"). Detect it and skip staging; the Release job still runs,
+      # so a tag pushed after a direct publish still leaves the draft Release behind.
+      - name: Is this version already on the registry?
+        id: published
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="$(node -p "require('./package.json').version")"
+          if npm view "dsh-map-tools@${v}" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::dsh-map-tools@${v} is already published; skipping the staging step"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # No token and no `--provenance` flag: npm takes the OIDC identity for the
       # grant and attaches provenance itself for a public package. Note that staging
       # does *not* need 2FA — only approving the staged package does.
       - name: Stage on npm
+        if: steps.published.outputs.already != 'true'
         run: npm stage publish
 
       - name: What is left to do
+        if: steps.published.outputs.already != 'true'
         shell: bash
         run: |
           {
@@ -118,6 +137,21 @@ jobs:
             echo "npm stage list dsh-map-tools"
             echo "# prompts for 2FA; npmjs.com -> Staged Packages works too"
             echo "npm stage approve <stage-id>"
+            echo "gh release edit ${GITHUB_REF_NAME} --draft=false"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Already public
+        if: steps.published.outputs.already == 'true'
+        shell: bash
+        run: |
+          {
+            echo "### \`${GITHUB_REF_NAME}\` is already public — nothing was staged"
+            echo
+            echo "npm already serves this version, so there is nothing to approve."
+            echo "The draft Release below is the one thing left:"
+            echo
+            echo '```bash'
             echo "gh release edit ${GITHUB_REF_NAME} --draft=false"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
