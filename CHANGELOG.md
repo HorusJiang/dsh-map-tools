@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.3] - 2026-09-30
+
+### Added
+
+- **插件图标：小篆「径」。** `package.json` 增加 `icon: "icon.svg"`，图标直接取自
+  `assets/banner.svg` 里「湖山千里 · 一径相通」那枚描摹轮廓（`JFZSKSealScript`，与印章同一笔），
+  重建成**一条不自交的、单一 `<path>` 的轮廓**后居中放进 36 视框。DSH 插件页的包卡片、
+  详情页和插件行会显示它：Host 的 `readPluginMeta()`（`@deepseek-ai/dsh-app-boot`
+  `lib/types/package-meta.js`）读 `package.json.icon`，按扩展名映射 MIME 后编码成
+  `image/svg+xml;base64` 的 data URL 交给 `<img src>`；只有未声明或解码失败时才回落到
+  默认插画。`files` 里同时加上 `icon.svg`——`files` 是 allowlist，不带上的话装了插件
+  也没有图标。已知限制：图标必须留在包目录内、≤ 256 KiB，且不能是绝对路径或带 scheme。
+- **为什么这一版线条偏细。** 原描摹是给 1200px 宽的 banner 用的：在 36 视框下笔画只有约
+  **0.35** 单位宽，而巛 三笔之间的空隙只有 **0.9–1.4** 单位。任何足以"加粗"的描边都会在
+  每侧各挤掉 0.6，把整个巠部连同上下两道横粘成一块红斑（旧版 `stroke-width="12"` 的
+  实测效果就是如此）。因此只做了 0.2 单位的匀粗——正好是不封住任何空隙的上限——并把
+  红色加深到 `#B33325`，让发丝级线条在浅底上还立得住；放大后三笔巛、两道横与竖笔各自
+  分明。想要更重的字形只能简化笔画，那已经不属于"banner 里那个径"，故未采用。
+
 ## [0.7.2] - 2026-09-25
 
 ### Added
