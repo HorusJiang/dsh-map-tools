@@ -346,7 +346,7 @@ node scripts/config-e2e.mjs           # 配置回环：卡片数据通路端到�
 node scripts/integration.mjs          # 真实网络：免费源（OSRM / Nominatim）
 node scripts/amap-e2e.mjs             # 真实网络：高德（需 AMAP_API_KEY）
 node scripts/call-driving-route.mjs   # 单次调用示例
-node scripts/check-secrets.mjs        # 密钥守卫
+node scripts/check-secrets.mjs --all  # 密钥守卫（全树扫描；无参数则只扫暂存区）
 pnpm hooks                            # 安装 pre-commit 密钥守卫
 ```
 

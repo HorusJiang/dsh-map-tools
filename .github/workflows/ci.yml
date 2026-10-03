@@ -59,6 +59,13 @@ jobs:
       - name: The tarball carries nothing local
         run: node scripts/check-tarball.mjs
 
+      # The same guard the pre-commit hook runs, in the one mode a commit cannot provide.
+      # `--all` reads the tracked files; the hook's default mode reads `git diff --cached`
+      # and would scan nothing here. Without this step the guard was opt-in — it protected
+      # only whoever had run `pnpm hooks`, which no workflow checked either.
+      - name: No key-shaped values in the tree
+        run: node scripts/check-secrets.mjs --all
+
   # `engines` promises Node 20, and only the *artifact* can be checked there: the
   # suite is TypeScript run by vitest, so "the tests passed on 22" says nothing about
   # what a Node 20 consumer loads. The two claims are verified separately — the suite

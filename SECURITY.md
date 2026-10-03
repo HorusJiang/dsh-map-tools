@@ -36,7 +36,7 @@ was at 0.7.3), so treat `package.json` as the source of truth if they ever disag
 
 ## Leak protection (defense in depth)
 
-Three layers keep keys out of the repository:
+Four layers keep keys out of the repository:
 
 1. **Storage location**: keys live in `~/.dsh-map-tools/config.json`, outside
    any git working tree by design.
@@ -48,6 +48,12 @@ Three layers keep keys out of the repository:
    (`scripts/install-hooks.mjs`, contributors only — never for npm consumers,
    and the published package carries no build script). Run manually with
    `pnpm check:secrets`.
+4. **CI**: the same script runs on every push and pull request as
+   `node scripts/check-secrets.mjs --all`, which reads the tracked files instead of the
+   staging area. Layer 3 only protects a contributor who has installed the hook and who
+   did not pass `--no-verify`; layer 4 is the one that cannot be skipped locally. It is
+   also the reason the script has an `--all` mode at all — in CI there is no staging
+   area, so the pre-commit mode would have scanned nothing and reported "clean".
 
 ## Reporting a vulnerability
 
