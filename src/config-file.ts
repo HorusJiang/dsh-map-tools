@@ -6,7 +6,7 @@
  * document), and the settings card reads/writes it through a loopback route.
  */
 
-import { mkdirSync, readFileSync, writeFileSync, lstatSync, chmodSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, lstatSync, chmodSync, existsSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -78,9 +78,14 @@ const DEPRECATED_KEYS = ['baiduAk', 'defaultMode'] as const
 function restrictToOwner(path: string): void {
   try {
     if (process.platform === 'win32') {
+      // Resolved to an absolute path rather than looked up through `PATH`: a hostile or
+      // merely unusual PATH must not redirect this to a different `icacls`.
+      // (SonarCloud S4036 flags the bare-name form for exactly that reason.)
+      const icacls = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'icacls.exe')
+      if (!existsSync(icacls)) return
       // /inheritance:r drops inherited ACEs, /grant:r replaces the rest with this user.
       const who = process.env.USERNAME ?? userInfo().username
-      execFileSync('icacls', [path, '/inheritance:r', '/grant:r', `${who}:F`], { stdio: 'ignore' })
+      execFileSync(icacls, [path, '/inheritance:r', '/grant:r', `${who}:F`], { stdio: 'ignore' })
     } else {
       // Runs on every write, not only on creation: an existing file with wider
       // permissions is tightened rather than left as it was.
