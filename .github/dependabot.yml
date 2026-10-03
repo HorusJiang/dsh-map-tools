@@ -25,14 +25,7 @@ updates:
       interval: weekly
     commit-message:
       prefix: chore
+    open-pull-requests-limit: 5
     groups:
       deepseek-ai:
         patterns: ['@deepseek-ai/*']
-
-  - package-ecosystem: npm
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 3
-    exclude-paths:
-      - 'package.json'
