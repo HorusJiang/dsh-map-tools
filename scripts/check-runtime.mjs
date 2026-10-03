@@ -31,7 +31,7 @@ if (!Array.isArray(index.inject) || !index.inject.includes('tools')) {
 const { Config, AMAP_APPLY_URL } = await import('../lib/config.js')
 
 const defaults = Config({})
-const expected = { provider: 'amap', timeoutMs: 15000, maxQps: 2, defaultMode: 'driving', language: 'zh' }
+const expected = { provider: 'amap', timeoutMs: 15000, maxQps: 2, language: 'zh' }
 if (JSON.stringify(defaults) !== JSON.stringify(expected)) {
   throw new Error(`the config schema resolved to unexpected defaults: ${JSON.stringify(defaults)}`)
 }

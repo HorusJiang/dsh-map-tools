@@ -1,0 +1,13 @@
+# Keep every checkout byte-identical across platforms.
+#
+# Without this, a Windows checkout with `core.autocrlf=true` rewrites every line ending
+# on the way in, and each `git add` converts them back on the way out. The repository
+# content stays correct, but the churn is noisy and — worse — it hides real changes
+# behind whole-file diffs. This project is developed on Windows and tested on Windows
+# and Linux, so the two must agree on what a file contains.
+* text=auto eol=lf
+
+# Assets. Never touch their bytes.
+*.png binary
+*.jpg binary
+*.svg text eol=lf

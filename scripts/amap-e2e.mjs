@@ -60,7 +60,6 @@ const config = plugin.Config({
   provider: 'amap',
   amapKey: key,
   timeoutMs: 30000,
-  defaultMode: 'driving',
   language: 'zh',
 })
 plugin.apply(ctx, config)

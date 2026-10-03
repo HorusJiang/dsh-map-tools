@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, existsSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { applyConfig, configPath, configSummary, readConfig } from '../src/config-file.js'
@@ -63,5 +63,35 @@ describe('config-file', () => {
     expect('baiduAk' in saved).toBe(false)
     expect(saved.amapKey).toBe('test-key')
     expect(saved.timeoutMs).toBe(30000)
+  })
+
+  // `defaultMode` was documented from 0.1.0 but no code path ever read it, so it was
+  // removed from the schema. A user file that still carries it is cleaned up on the
+  // next save — including the other keys, which must survive the purge.
+  it('purges the removed defaultMode field on save, keeping its neighbours', () => {
+    writeFileSync(
+      configPath(),
+      JSON.stringify({ provider: 'osm', defaultMode: 'walking', maxQps: 2 }),
+      'utf8',
+    )
+    applyConfig({ timeoutMs: 30000 })
+    const saved = readConfig()
+    expect('defaultMode' in saved).toBe(false)
+    expect(saved.provider).toBe('osm')
+    expect(saved.maxQps).toBe(2)
+    expect(saved.timeoutMs).toBe(30000)
+  })
+
+  // The file holds an API key, so its resting permissions matter. `writeFileSync`'s
+  // `mode` only applies at creation and Node ignores POSIX mode bits on Windows, where
+  // the plugin uses `icacls` instead — so this assertion is meaningful on POSIX only.
+  it.skipIf(process.platform === 'win32')('tightens an existing over-permissive file to 0600', () => {
+    writeFileSync(configPath(), JSON.stringify({ amapKey: 'k' }), { encoding: 'utf8', mode: 0o644 })
+    expect(statSync(configPath()).mode & 0o777).toBe(0o644)
+
+    applyConfig({ timeoutMs: 1234 })
+
+    // Not just on creation: an already-wider file is narrowed rather than left as it was.
+    expect(statSync(configPath()).mode & 0o777).toBe(0o600)
   })
 })

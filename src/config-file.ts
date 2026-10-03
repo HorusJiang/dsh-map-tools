@@ -6,9 +6,10 @@
  * document), and the settings card reads/writes it through a loopback route.
  */
 
-import { mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { mkdirSync, readFileSync, writeFileSync, lstatSync, chmodSync } from 'node:fs'
+import { homedir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
+import { execFileSync } from 'node:child_process'
 
 /** The file the plugin's settings card reads and writes. Overridable for tests. */
 export function configPath(): string {
@@ -51,8 +52,45 @@ export function readConfig(): MapToolsFileConfig {
   return parsed as MapToolsFileConfig
 }
 
-/** Deprecated config keys, purged on every save (Baidu provider dropped in 0.3.0). */
-const DEPRECATED_KEYS = ['baiduAk'] as const
+/**
+ * Deprecated config keys, purged on every save.
+ *
+ * - `baiduAk` — the Baidu provider was dropped in 0.3.0.
+ * - `defaultMode` — documented since 0.1.0 but never consumed by any code path (the four
+ *   route tools each fix their own mode, so a "default mode" had nothing to apply to).
+ *   Removed from the schema in 0.7.4; purged here so it does not linger in user files.
+ */
+const DEPRECATED_KEYS = ['baiduAk', 'defaultMode'] as const
+
+/**
+ * Restrict the config file to its owner.
+ *
+ * `writeFileSync(..., { mode: 0o600 })` only applies the mode when it *creates* the
+ * file, and Node ignores POSIX mode bits on Windows entirely — so on Windows, the
+ * author's own platform, the documented "0600" was not a control at all: the file
+ * inherited the profile ACL, where `BUILTIN\Users` can read it. Measured on
+ * Node v24.13.0: `writeFileSync(p, "x", { mode: 0o600 })` leaves `mode` at `0o666`.
+ *
+ * So the mode is enforced explicitly on every write, and by the platform's own tool on
+ * Windows. Both paths are best-effort: a filesystem that cannot express ownership
+ * (a FAT volume, a network share, an unusual ACL) must not make saving a config fail.
+ */
+function restrictToOwner(path: string): void {
+  try {
+    if (process.platform === 'win32') {
+      // /inheritance:r drops inherited ACEs, /grant:r replaces the rest with this user.
+      const who = process.env.USERNAME ?? userInfo().username
+      execFileSync('icacls', [path, '/inheritance:r', '/grant:r', `${who}:F`], { stdio: 'ignore' })
+    } else {
+      // Runs on every write, not only on creation: an existing file with wider
+      // permissions is tightened rather than left as it was.
+      chmodSync(path, 0o600)
+    }
+  } catch {
+    // Best effort. The file is still written and readable to its owner; failing to
+    // narrow the ACL is not a reason to lose the user's configuration.
+  }
+}
 
 /** Persist a patch onto the config file, then return the new whole. */
 export function applyConfig(patch: Partial<MapToolsFileConfig>): MapToolsFileConfig {
@@ -63,13 +101,15 @@ export function applyConfig(patch: Partial<MapToolsFileConfig>): MapToolsFileCon
       else current[key] = patch[key] as never
     }
   }
-  // Purge deprecated fields (e.g. baiduAk from the pre-0.3.0 Baidu provider)
-  // so dead keys don't linger in the config file.
+  // Purge deprecated fields (e.g. baiduAk from the pre-0.3.0 Baidu provider, and
+  // defaultMode, which never had a code path that consumed it).
   for (const key of DEPRECATED_KEYS) {
     if (key in current) delete (current as Record<string, unknown>)[key]
   }
-  mkdirSync(dirname(configPath()), { recursive: true })
+  const dir = dirname(configPath())
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
   writeFileSync(configPath(), `${JSON.stringify(current, null, 2)}\n`, { mode: 0o600 })
+  restrictToOwner(configPath())
   return current
 }
 

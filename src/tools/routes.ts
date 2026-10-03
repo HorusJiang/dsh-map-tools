@@ -17,7 +17,6 @@ export interface MapClients {
   resolve: (text: string, signal: AbortSignal) => Promise<LngLat>
   /** Resolve the city name for a point (transit queries need city1/city2). */
   resolveCity: (text: string, signal: AbortSignal) => Promise<string>
-  defaultMode: 'driving' | 'transit' | 'walking' | 'bicycling'
 }
 
 interface RouteArgs {

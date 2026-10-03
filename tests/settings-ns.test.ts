@@ -45,7 +45,7 @@ describe('settings-ns (DSH ≥ 0.1.2-rc.1 API)', () => {
   it('registers the plain-string namespace via SettingsProvider.installSection', () => {
     const { settings, installed } = stubSettings()
     const ctx = contextWithSettings(settings)
-    const entry: ConfigType = { provider: 'amap', timeoutMs: 15000, maxQps: 2, defaultMode: 'driving', language: 'zh' }
+    const entry: ConfigType = { provider: 'amap', timeoutMs: 15000, maxQps: 2, language: 'zh' }
     installSettingsNamespace(ctx, entry, () => {})
 
     expect(installed).toHaveLength(1)
@@ -77,7 +77,7 @@ describe('settings-ns (DSH ≥ 0.1.2-rc.1 API)', () => {
     const ctx = contextWithSettings(settings)
     installSettingsNamespace(ctx, {} as ConfigType, () => {})
 
-    const scope: ConfigType = { provider: 'osm', timeoutMs: 9000, maxQps: 2, defaultMode: 'walking', language: 'zh' }
+    const scope: ConfigType = { provider: 'osm', timeoutMs: 9000, maxQps: 2, language: 'zh' }
     expect(() => installed[0]!.hooks.setSource(() => scope)).not.toThrow()
   })
 
