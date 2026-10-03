@@ -110,4 +110,4 @@ node scripts/check-runtime.mjs   # 构建产物能在声明的最低 Node 上加
 - 不把 key 写入代码、README 示例或任何可提交文件。
 - 不改动 `cordis.patch.yml` 的插件 id（`map-tools`）——影响已安装用户。
 - 不引入百度/其他需要额外白名单配置的数据源。
-- 不在仓库内创建 `config.json` / `.env` / 密钥文件；pre-commit 钩子会拦截含 key 的提交（`scripts/check-secrets.mjs`，开发者用 `pnpm hooks` 安装）。修改钩子后必须验证：假 key 提交被拒、正常提交放行。
+- 不在仓库内创建 `config.json` / `.env` / 密钥文件；两道守卫都会拦：**pre-commit 钩子**（`scripts/check-secrets.mjs`，开发者用 `pnpm hooks` 安装，只扫暂存区）与 **CI**（同一个脚本的 `--all` 模式，扫全部已跟踪文件——暂存区在 CI 里是空的，不换模式等于什么都没扫）。改这个脚本后必须验证两件事：**假 key 被拒**、**正常树放行**。
