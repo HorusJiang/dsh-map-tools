@@ -42,6 +42,16 @@ name: release
 on:
   push:
     tags: ['v*']
+  # The only manual path, and it requires typing out the acknowledgement: a
+  # version that reached the registry without provenance cannot be taken back,
+  # so continuing past that check has to be a decision somebody made on purpose.
+  workflow_dispatch:
+    inputs:
+      acknowledge_unprovenanced:
+        description: 'Stage even though this version is already public without provenance (irreversible)'
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -52,14 +62,14 @@ jobs:
     name: stage on npm
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # pnpm first: setup-node's `cache: pnpm` needs the store path it defines.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 11
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
@@ -99,22 +109,77 @@ jobs:
       - name: The tarball carries nothing local
         run: node scripts/check-tarball.mjs
 
-      # A version that is already public must not fail the run: npm refuses a second
-      # staging of the same version, and the tag itself is still the truth ("this is
-      # the release commit"). Detect it and skip staging; the Release job still runs,
-      # so a tag pushed after a direct publish still leaves the draft Release behind.
-      - name: Is this version already on the registry?
+      # A version being on the registry does NOT mean this pipeline put it there.
+      # A local `npm publish` satisfies `npm view` exactly as a staged release does,
+      # so the old check ("is it published? then we must have staged it") could only
+      # ever wave a bypass through, and did: 0.1.13 and 0.7.3 shipped with no
+      # provenance and a green run. Ask the question that actually distinguishes the
+      # two paths instead — is the version *attested*? Provenance exists only for a
+      # release that came through this workflow, so its absence is the truthful
+      # signal that something published outside the gate.
+      #
+      # `already` is what npm forces on us (it refuses a second staging of a
+      # published version); `unprovenanced` is what we refuse to pass off as fine.
+      - name: Is this version already public, and was it attested?
         id: published
         shell: bash
         run: |
           set -euo pipefail
           v="$(node -p "require('./package.json').version")"
-          if npm view "dsh-map-tools@${v}" version >/dev/null 2>&1; then
-            echo "already=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::dsh-map-tools@${v} is already published; skipping the staging step"
-          else
-            echo "already=false" >> "$GITHUB_OUTPUT"
+
+          attest() {
+            curl -sf -o /dev/null \
+              "https://registry.npmjs.org/-/npm/v1/attestations/dsh-map-tools@${v}"
+          }
+
+          if ! npm view "dsh-map-tools@${v}" version >/dev/null 2>&1; then
+            echo "unprovenanced=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::dsh-map-tools@${v} is not on the registry yet; nothing to compare against"
+            exit 0
           fi
+
+          echo "already=true" >> "$GITHUB_OUTPUT"
+          if attest; then
+            echo "unprovenanced=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::dsh-map-tools@${v} is public and carries provenance; nothing to stage"
+          else
+            echo "unprovenanced=true" >> "$GITHUB_OUTPUT"
+            echo "::warning title=dsh-map-tools@${v} is public WITHOUT provenance::This version did not come through this workflow."
+          fi
+
+      # npm refuses a second staging, so the gate *is* the red run: the only fix for
+      # a version that is already public is a version that is not. Fail unless the
+      # person running this said, by hand, that they know the version is unprovenanced.
+      - name: Refuse to pass an unattested release off as a normal one
+        if: steps.published.outputs.unprovenanced == 'true' && inputs.acknowledge_unprovenanced != true
+        shell: bash
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          {
+            echo "::error title=dsh-map-tools@${v} is public without provenance::It did not come through this workflow, and npm will not let a published version be staged again."
+            echo "### \`dsh-map-tools@${v}\` is public, and unattested"
+            echo
+            echo "This is the case the gate exists to catch: a version reached the registry"
+            echo "without passing through \`npm stage publish\`, so it has no provenance and"
+            echo "no 2FA approval behind it."
+            echo
+            echo "It cannot be repaired - npm refuses a second staging of a published version."
+            echo "Going forward:"
+            echo
+            echo "\`\`\`bash"
+            echo "# confirm the registry really has no attestation for it (404 = none)"
+            echo "curl -s -o /dev/null -w '%{http_code}\n' \"
+            echo "  https://registry.npmjs.org/-/npm/v1/attestations/dsh-map-tools@${v}"
+            echo "\`\`\`"
+            echo
+            echo "- If this tag is the release: bump to the next patch, re-tag, and let this"
+            echo "  workflow stage it. Versions from here on will carry provenance."
+            echo "- If the tag is only there to record an already-public version, run this"
+            echo "  workflow by hand (Actions -> release -> Run workflow) with"
+            echo "  \`acknowledge_unprovenanced\` checked. The draft Release below is fine"
+            echo "  either way."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       # No token and no `--provenance` flag: npm takes the OIDC identity for the
       # grant and attaches provenance itself for a public package. Note that staging
@@ -142,7 +207,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Already public
-        if: steps.published.outputs.already == 'true'
+        if: steps.published.outputs.already == 'true' && steps.published.outputs.unprovenanced != 'true'
         shell: bash
         run: |
           {
@@ -170,9 +235,9 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
 
