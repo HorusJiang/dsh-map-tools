@@ -1,0 +1,38 @@
+# Keep the commit-SHA pins on the workflows fresh.
+#
+# Every third-party action in this repository is pinned to a full commit SHA rather
+# than a moving major tag, because the release job runs with `contents: write` and the
+# staging job exchanges an OIDC token. A pin without a bump mechanism just ages in
+# silence, so Dependabot opens a PR with the new SHA and the release notes behind it.
+#
+# `@deepseek-ai/*` is grouped on purpose: those packages move through alpha/rc lines
+# quickly, and one grouped bump is easier to judge for compatibility than five.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: chore
+    groups:
+      deepseek-ai:
+        patterns: ['@deepseek-ai/*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    exclude-paths:
+      - 'package.json'
