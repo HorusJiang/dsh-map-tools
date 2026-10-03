@@ -1,11 +1,29 @@
 /**
- * One-command publish for dsh-map-tools (local — this repo has no CI yet).
+ * One-command publish for dsh-map-tools.
+ *
+ * **正常发版不走这个脚本**：走 tag → CI（.github/workflows/release.yml）→ 2FA 批准。
+ * 见仓库根目录的 [RELEASING.md](../RELEASING.md)。本脚本用于**没有 CI、或 CI 不可用**
+ * 的时候，是那条流程的手动等价物。
  *
  * Usage:
- *   node scripts/publish.mjs                 # 发布：构建 → 测试 → 打包检查 → npm publish → 验证可安装
- *   node scripts/publish.mjs --stage         # 两段式：npm stage publish，等维护者 2FA 批准
+ *   node scripts/publish.mjs                 # 两段式：构建 → 测试 → 打包检查 → npm stage publish → 等 2FA 批准
+ *   node scripts/publish.mjs --direct        # ⚠️ 直发：npm publish，版本立刻公开（见下方警告）
  *   node scripts/publish.mjs --verify-only   # 只验证某个版本"真的能装上"（不发布）
  *   node scripts/publish.mjs --skip-tests    # 跳过测试闸门（仅排障用）
+ *
+ * ## 为什么默认是 staging，直发必须显式 --direct
+ *
+ * 2026-10-03 起，`.github/workflows/release.yml` 会在推 tag 时检查**这个版本有没有
+ * provenance**（有则说明它确实由这条 workflow stage 过）。直发的版本**永远没有**
+ * provenance，而 npm 不允许已发布的版本再次 staging —— 于是那个版本**无法补救**，
+ * 之后每次推它的 tag 都会让 release run 变红。
+ *
+ * 所以直发不是一个"少一步"的快捷方式，它会**永久污染一个版本号**：唯一的修法是换一个
+ * 版本号重发。要让这次直发不阻塞 tag 发布，只能手动触发 workflow
+ * （`workflow_dispatch` + `acknowledge_unprovenanced`）——那是给已经发生的意外准备的，
+ * 不是常规路径。
+ *
+ * 结论：默认走 staging；`--direct` 只在你明确知道为什么需要它、并且接受上面这个代价时用。
  *
  * ## npm 现在的行为（旧文档里的"bypass-2FA token"已经过时）
  *
@@ -14,11 +32,9 @@
  * 2FA 批准（`npm stage list <pkg>` → `npm stage approve <stage-id>`，或 npmjs.com
  * 的 Staged Packages 页）才真正公开。`npm stage` 需要 npm >= 11.15.0。
  *
- * dsh-jev-tools 的 CI（.github/workflows/release.yml）走的就是这条路：trusted
- * publisher 配成 **stage-only**（`npm publish` 不在允许的动作里），tag 触发 → 跑闸门
- * → `npm stage publish` → 人工 2FA 批准 → 把草稿 Release 转正。dsh-map-tools 还没搭
- * CI，本脚本就是同一件事的本地版：默认直接 `npm publish`（本地登录账号可直发），
- * `--stage` 走两段式。
+ * dsh-jev-tools 与 dsh-map-tools 的 CI 走的都是这条路：trusted publisher 配成
+ * **stage-only**（`npm publish` 不在允许的动作里），tag 触发 → 跑闸门 → `npm stage publish`
+ * → 人工 2FA 批准 → 把草稿 Release 转正。本脚本是同一件事的本地版。
  *
  * ## 验证为什么这么写（0.7.0 发布时实测的坑）
  *
@@ -43,7 +59,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const pkgRoot = path.resolve(__dirname, '..')
 const args = new Set(process.argv.slice(2))
 const verifyOnly = args.has('--verify-only')
-const stageOnly = args.has('--stage')
+/** 默认两段式；只有显式 `--direct` 才直发。见文件头的警告。 */
+const direct = args.has('--direct')
 const skipTests = args.has('--skip-tests')
 
 /** 传播窗口：默认 12 次 × 15s ≈ 3 分钟（实测 0.7.0 各处对齐花了 5 分钟上下，可调）。 */
@@ -100,7 +117,12 @@ function metadataVisible() {
   }
 }
 
-/** 两段式发布后，人要做的两步。 */
+/**
+ * 本地 staging 之后，人还要做的两步。
+ *
+ * 这里**没有** `gh release edit`：本地 staging 不经过 CI，所以不会留下草稿 Release
+ * （那是 workflow 的 release job 干的）。本地这条路如果要 GitHub Release，得手工建。
+ */
 function printApprovalHint() {
   console.log(`  npm stage list ${pkg.name}`)
   console.log('  npm stage approve <stage-id>          # 会要 2FA；npmjs.com → Staged Packages 也行')
@@ -119,17 +141,20 @@ if (!verifyOnly) {
     process.exit(1)
   }
 
-  // 2. 两段式需要 npm >= 11.15.0。缺了就**明确失败**，不偷偷退回直发——那会绕过人工批准。
-  //    先于任何配置/构建检查，省得白跑一遍才说不支持。
-  if (stageOnly) {
+  // 2. 两段式需要 npm >= 11.15.0。缺了就**明确失败**，不偷偷退回直发——那会绕过人工批准，
+  //    并且给版本留下一个无法补发的状态（见文件头）。先于任何配置/构建检查，省得白跑一遍。
+  if (!direct) {
     try {
       check('npm stage --help')
     } catch {
       console.error(`\n❌ 本机 npm ${check('npm --version')} 没有 \`npm stage\`（需要 >= 11.15.0）。`)
       console.error("   升级：npm install --global 'npm@^11.15.0'")
-      console.error('   或者去掉 --stage 直接发布（本地登录账号可直发）。')
+      console.error('   如果确实无法升级，只能 `--direct` 直发——但那会让该版本无法由 CI 补发，')
+      console.error('   之后再推它的 tag 会让 release run 变红（见 RELEASING.md）。')
       process.exit(1)
     }
+  } else {
+    console.log('\n⚠️  --direct：这次发布不会带 provenance，该版本之后无法由 CI staging 补发。')
   }
 
   // 3. 本项目固定用官方源（用户级 registry 可能是镜像；已是官方源时是空操作）
@@ -142,7 +167,7 @@ if (!verifyOnly) {
   run('npm pack --dry-run')
 
   // 5. 发布
-  const publishCommand = stageOnly ? 'npm stage publish' : 'npm publish --access public'
+  const publishCommand = direct ? 'npm publish --access public' : 'npm stage publish'
   console.log(`\n$ ${publishCommand}`)
   try {
     process.stdout.write(execSync(publishCommand, { cwd: pkgRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }))
@@ -158,7 +183,7 @@ if (!verifyOnly) {
     }
   }
 
-  if (stageOnly) {
+  if (!direct) {
     // staging 之后 tarball 本来就不公开，等传播没有意义：直接把"人要做的那两步"说清楚。
     console.log(`\nℹ️  已 staging ${spec} —— 现在它还不是公开版本，谁都装不到。`)
     console.log('   用 2FA 批准后才对所有人生效：')
@@ -201,10 +226,14 @@ if (installed !== undefined) {
       ? '   与本地构建产物 sha1 一致 —— 发出去的就是测过的那份字节'
       : `   ⚠️  与本地构建产物 sha1 不同（本地 ${localSha}）；内容差异需人工确认（npm 版本不同也会导致字节不同）`)
   }
-  if (!verifyOnly) {
-    console.log('\n接下来（若还没做）：')
+  if (direct) {
+    // 只有直发这条路才需要事后补 tag；而且必须把代价说清楚，否则下一个人会以为这是正常流程。
+    console.log('\n接下来：')
     console.log(`  git tag -a v${pkg.version} -m "${pkg.name} ${pkg.version}"`)
     console.log(`  git push origin v${pkg.version}`)
+    console.log(`\n⚠️  这个版本是直发的，没有 provenance：推上面的 tag 会让 release run 变红，`)
+    console.log('   这是预期的（它在告诉你这个版本没走闸门）。要让它过去，只能手动触发')
+    console.log('   workflow（workflow_dispatch + acknowledge_unprovenanced），或者换版本号重发。')
   }
   process.exit(0)
 }
