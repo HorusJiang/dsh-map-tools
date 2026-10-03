@@ -8,7 +8,7 @@
 src/
   index.ts          # 插件入口：buildClients（配置文件优先）+ apply
   config.ts         # Schemastery 配置 schema + 申请链接常量
-  config-file.ts    # ~/.dsh-map-tools/config.json 读写（0600）
+  config-file.ts    # ~/.dsh-map-tools/config.json 读写（仅属主）
   config-route.ts   # 回环路由 /dsh-map-tools/config（同源校验）
   settings-ns.ts    # 老宿主设置页 namespace 注册（新宿主走 bundle 座位）
   clients/          # 数据源客户端
@@ -36,7 +36,10 @@ scripts/            # smoke / integration / amap-e2e / config-e2e / publish
 
 ### 配置
 
-- 配置只存 **`~/.dsh-map-tools/config.json`**（0600），不存 DSH 设置文档。
+- 配置只存 **`~/.dsh-map-tools/config.json`**（仅属主可读写），不存 DSH 设置文档。
+  POSIX 上是 `chmod 0600`；Windows 上 Node 忽略 POSIX mode 位，改用 `icacls` 去掉继承的
+  ACE（见 `restrictToOwner()`）。**改动这条时两个平台都要照顾到**——只写 `mode: 0o600`
+  在 Windows 上等于没写（实测落盘 `0o666`）。
 - key **绝不**回显到前端或日志；路由只返回 `hasAmapKey` 布尔。
 - 配置优先级：配置文件 → `cordis.yml` 默认值。修改 buildClients 时保持这个优先级。
 - 配置文件路径可通过 `DSH_MAP_TOOLS_CONFIG` 环境变量覆盖（测试用）。

@@ -187,7 +187,7 @@ Its behaviour matches the official configuration pages: edits are **staged and w
 
 ### Config file
 
-Config lives in **`~/.dsh-map-tools/config.json`** (mode 0600), decoupled from the DSH settings document and **shared across profiles**. The path can be overridden with the `DSH_MAP_TOOLS_CONFIG` environment variable.
+Config lives in **`~/.dsh-map-tools/config.json`** (owner-only), decoupled from the DSH settings document and **shared across profiles**. The path can be overridden with the `DSH_MAP_TOOLS_CONFIG` environment variable. Permissions are re-tightened on every save: `chmod 0600` on POSIX, `icacls` (dropping inherited ACEs) on Windows, where Node ignores POSIX mode bits — see [SECURITY.md](SECURITY.md).
 
 ```jsonc
 // ~/.dsh-map-tools/config.json
@@ -196,7 +196,6 @@ Config lives in **`~/.dsh-map-tools/config.json`** (mode 0600), decoupled from t
   "amapKey": "…",         // Amap "Web Service" key (secret, never echoed)
   "timeoutMs": 15000,
   "maxQps": 2,            // max Amap requests per second
-  "defaultMode": "driving",
   "language": "zh"
 }
 ```
@@ -207,7 +206,6 @@ Config lives in **`~/.dsh-map-tools/config.json`** (mode 0600), decoupled from t
 | `amapKey` | — | ✅ | Amap **"Web Service"** key, [free to request](https://console.amap.com/dev/key/app) |
 | `timeoutMs` | `15000` | ✅ | Per-request timeout (ms) |
 | `maxQps` | `2` | edit JSON | Max Amap requests per second (2 sits below the usual limit of 3, avoiding `10021` quota errors) |
-| `defaultMode` | `driving` | edit JSON | Default route mode (`driving` / `transit` / `walking` / `bicycling`) |
 | `language` | `zh` | edit JSON | Response language (`zh` / `en`) |
 
 > The key is surfaced to the frontend only as a boolean (`hasAmapKey`); the literal is **never echoed to the page or the logs**.
@@ -278,7 +276,7 @@ Degradation is always **stated**, never silent and never faked:
 │      osrm.ts               OSRM free routing (fallback)       │
 │      photon.ts / nominatim.ts  free geocoding (fallback)      │
 │    src/geo.ts            geometry decode / decimate / encode  │
-│    src/config-file.ts    ~/.dsh-map-tools/config.json 0600    │
+│    src/config-file.ts    ~/.dsh-map-tools/config.json owner  │
 │    src/config-route.ts   GET/POST /dsh-map-tools/config       │
 │    src/staticmap-route.ts  GET /dsh-map-tools/staticmap       │
 │    src/settings-ns.ts    settings namespace registration      │
@@ -392,7 +390,7 @@ Versioning follows [SemVer](https://semver.org/); changes are tracked in [CHANGE
 
 ## Security
 
-How the API key is stored (`~/.dsh-map-tools/config.json`, 0600, never echoed) and how to report a vulnerability: see [SECURITY.md](SECURITY.md).
+How the API key is stored (`~/.dsh-map-tools/config.json`, owner-only, never echoed) and how to report a vulnerability: see [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

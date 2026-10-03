@@ -42,7 +42,7 @@ node scripts/config-e2e.mjs   # 配置读写回环
 
 ### 配置与安全
 
-- 配置只存 `~/.dsh-map-tools/config.json`（0600），key **绝不**回显到页面或日志。
+- 配置只存 `~/.dsh-map-tools/config.json`（仅属主可读写；POSIX 用 `chmod`，Windows 用 `icacls`），key **绝不**回显到页面或日志。
 - 配置优先级：配置文件 → `cordis.yml` 默认值。
 - 新增配置字段时同步更新：`config.ts`（schema）、`config-file.ts`（读写）、`config-route.ts`（路由）、`client/client.js`（卡片）、`README`。
 

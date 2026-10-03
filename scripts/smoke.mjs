@@ -36,7 +36,6 @@ ctx.provide('tools', tools)
 const config = plugin.Config({
   provider: 'osm',
   timeoutMs: 15000,
-  defaultMode: 'driving',
   language: 'zh',
 })
 

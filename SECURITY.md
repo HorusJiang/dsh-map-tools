@@ -7,13 +7,25 @@ versions receive fixes only when a security issue is backported explicitly.
 
 | Version | Supported |
 |---|---|
-| latest (0.6.x) | ✅ |
-| < 0.6.0 | ❌ |
+| latest (0.7.x) | ✅ |
+| < 0.7.0 | ❌ |
+
+The row above names the line, not a patch release: whatever `package.json` currently
+declares is the supported one. It has drifted before (it read `0.6.x` while the package
+was at 0.7.3), so treat `package.json` as the source of truth if they ever disagree.
 
 ## How keys are stored
 
-- Your Amap key lives in **`~/.dsh-map-tools/config.json`** with file mode
-  **0600** (owner read/write only).
+- Your Amap key lives in **`~/.dsh-map-tools/config.json`**, outside any git working
+  tree.
+- **Permissions.** The file is created with mode `0600` and re-tightened to owner-only on
+  every save. On POSIX that is `chmod 0600`; on **Windows** Node ignores POSIX mode bits
+  entirely, so the plugin instead runs
+  `icacls <file> /inheritance:r /grant:r "<user>:F"` to drop inherited ACEs. This is
+  best-effort: a filesystem that cannot express ownership (a FAT volume, some network
+  shares) is left as the platform makes it rather than failing the save. Check it
+  yourself on Windows with `icacls "%USERPROFILE%\.dsh-map-tools\config.json"` — you
+  should see only your own account and the OS service accounts.
 - The key is **never echoed** to the settings page or to logs. The host only
   reports a boolean (`hasAmapKey`) to the frontend card.
 - The settings card route (`/dsh-map-tools/config`) answers **same-origin

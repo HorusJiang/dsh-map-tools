@@ -97,7 +97,6 @@ function registerAll(ctx: Context, clients: ReturnType<typeof buildClients>): ()
     osrm: clients.osrm,
     resolve: clients.resolve,
     resolveCity: clients.resolveCity,
-    defaultMode: 'driving',
   }
   registerRouteTools(ctx, routeClients, disposers)
   registerGeocodeTools(ctx, { amap: clients.amap, nominatim: clients.nominatim, photon: clients.photon }, disposers)

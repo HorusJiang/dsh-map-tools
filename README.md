@@ -188,7 +188,7 @@ DSH 的**侧边栏「插件」页 → dsh-map-tools** 打开 bundle 详情页，
 
 ### 配置文件
 
-配置实际存储在 **`~/.dsh-map-tools/config.json`**（权限 0600），与 DSH 设置文档解耦、**跨 profile 共享**。路径可用 `DSH_MAP_TOOLS_CONFIG` 环境变量覆盖。
+配置实际存储在 **`~/.dsh-map-tools/config.json`**（仅属主可读写），与 DSH 设置文档解耦、**跨 profile 共享**。路径可用 `DSH_MAP_TOOLS_CONFIG` 环境变量覆盖。权限每次保存都会收紧：POSIX 用 `chmod 0600`，Windows 用 `icacls` 去掉继承的 ACE（Node 在 Windows 上忽略 POSIX mode 位），详见 [SECURITY.md](SECURITY.md)。
 
 ```jsonc
 // ~/.dsh-map-tools/config.json
@@ -197,7 +197,6 @@ DSH 的**侧边栏「插件」页 → dsh-map-tools** 打开 bundle 详情页，
   "amapKey": "……",        // 高德「Web 服务」key（secret，永不回显）
   "timeoutMs": 15000,
   "maxQps": 2,            // 高德每秒请求上限
-  "defaultMode": "driving",
   "language": "zh"
 }
 ```
@@ -208,7 +207,6 @@ DSH 的**侧边栏「插件」页 → dsh-map-tools** 打开 bundle 详情页，
 | `amapKey` | — | ✅ | 高德 **Web 服务** 类型 key，[免费申请](https://console.amap.com/dev/key/app) |
 | `timeoutMs` | `15000` | ✅ | 单次请求超时（毫秒） |
 | `maxQps` | `2` | 手改 JSON | 高德每秒最大请求数（默认 2 低于常见上限 3，防触发 `10021` 配额错误） |
-| `defaultMode` | `driving` | 手改 JSON | 默认路线模式（`driving` / `transit` / `walking` / `bicycling`） |
 | `language` | `zh` | 手改 JSON | 返回语言（`zh` / `en`） |
 
 > key 只以布尔标记 `hasAmapKey` 呈现给前端，**永远不会回显到页面或日志**。
@@ -279,7 +277,7 @@ DSH 的**侧边栏「插件」页 → dsh-map-tools** 打开 bundle 详情页，
 │      osrm.ts               OSRM 免费路线（兜底）            │
 │      photon.ts / nominatim.ts  免费地理编码（兜底）         │
 │    src/geo.ts            几何解码 / 去重 / 抽稀 / 编码      │
-│    src/config-file.ts    ~/.dsh-map-tools/config.json 0600  │
+│    src/config-file.ts    ~/.dsh-map-tools/config.json 仅属主 │
 │    src/config-route.ts   GET/POST /dsh-map-tools/config     │
 │    src/staticmap-route.ts  GET /dsh-map-tools/staticmap     │
 │    src/settings-ns.ts    老宿主设置页 namespace 注册         │
@@ -395,7 +393,7 @@ node scripts/publish.mjs --verify-only    # 只验证某个版本"真的能装�
 
 ## 安全
 
-API key 的存储方式（`~/.dsh-map-tools/config.json`，0600，永不回显）与漏洞报告流程见 [SECURITY.md](SECURITY.md)。
+API key 的存储方式（`~/.dsh-map-tools/config.json`，仅属主可读写，永不回显）与漏洞报告流程见 [SECURITY.md](SECURITY.md)。
 
 ## 贡献
 

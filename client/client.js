@@ -22,7 +22,7 @@
  *
  * **Where the data lives.** The host loopback route `/dsh-map-tools/config`,
  * never the DSH settings document. The key lives in
- * `~/.dsh-map-tools/config.json` (0600) and is never echoed back — the route
+ * `~/.dsh-map-tools/config.json` (owner-only) and is never echoed back — the route
  * answers `hasAmapKey: boolean` and nothing else — so the input starts blank on
  * every load and a blank left untouched is never written.
  *
@@ -421,7 +421,7 @@ window.__ModuleLoader__.load({
             h('p', { style: Object.assign({}, HINT_STYLE, { color: ERROR }), role: 'status' },
               '宿主路由 ' + CONFIG_URL + ' 当前不可用，无法在这里保存配置'
               + (state.note === '' ? '' : '（' + state.note + '）') + '。'),
-            h('p', { style: CAPTION_STYLE }, '插件宿主半未加载时会这样；可直接编辑 ~/.dsh-map-tools/config.json（0600）。'))
+            h('p', { style: CAPTION_STYLE }, '插件宿主半未加载时会这样；可直接编辑 ~/.dsh-map-tools/config.json（仅属主可读写）。'))
         }
 
         var config = state.config

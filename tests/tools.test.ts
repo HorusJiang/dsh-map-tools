@@ -35,7 +35,6 @@ const clients: MapClients = {
   osrm: { route: async () => ({ provider: 'osrm', distanceM: 1000, durationS: 60, polyline: '', points: [], steps: [] }) } as never,
   resolve: noopResolve,
   resolveCity: async () => '',
-  defaultMode: 'driving',
 }
 
 describe('tool registration', () => {
@@ -215,7 +214,6 @@ describe('起终点可读名称（坐标入参时反查）', () => {
       osrm: { route: async () => ({ provider: 'osrm', distanceM: 1, durationS: 1, polyline: '', points: [], geometry: [], steps: [] }) } as never,
       resolve: options.resolve ?? noopResolve,
       resolveCity: async () => '',
-      defaultMode: 'driving',
     }
     registerRouteTools(ctx, clients, [])
     return tools
@@ -365,7 +363,6 @@ describe('route tool OSRM fallback on Amap quota errors', () => {
       } as never,
       resolve: noopResolve,
       resolveCity: async () => '',
-      defaultMode: 'driving',
     }
     registerRouteTools(ctx, clients, [])
     return { clients, tools }

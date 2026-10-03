@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Removed
+
+- **`defaultMode` 配置项。** 它从 0.1.0 起就写在 `config.ts` 的 schema 与 README 的配置表里
+  （「默认路线模式」），但**没有任何代码路径消费它**：四个路线工具各自固定自己的 mode
+  （`routeTool('map_driving_route', …, 'driving', …)` 这样硬编码），所以「默认模式」在这个
+  架构里没有能起作用的位置。用户按文档把它写进 `config.json` 或 `cordis.yml` 都不会有任何
+  效果，也不会报错——这类设置比缺失的设置更糟。现在从 schema、`Config` 接口、`MapClients`
+  接口、`index.ts` 的构造处、README 两张表（中英）里一并移除，并加入 `DEPRECATED_KEYS`，
+  下次保存配置时自动从用户文件里清掉。**0.x 阶段的破坏性变更**，故记在此处。
+
+### Fixed
+
+- **Windows 上密钥文件的权限从来没被收紧过。** README 与 SECURITY.md 一直把
+  `~/.dsh-map-tools/config.json` 的 **0600** 当作安全承诺写着，但 `writeFileSync` 的
+  `mode` 只在**创建**文件时生效，而且 **Node 在 Windows 上完全忽略 POSIX mode 位**——
+  实测（Node v24.13.0）落盘结果是 `0o666`，ACL 里 `BUILTIN\Users` 可读、`Authenticated Users`
+  可写。也就是说在作者自己的平台（也是 DSH 桌面版的主场）上，这条承诺并不成立。
+  现在每次保存都显式收紧：POSIX 用 `chmodSync(path, 0o600)`（不只是创建时），Windows 用
+  `icacls <file> /inheritance:r /grant:r "<user>:F"` 去掉继承的 ACE；配置文件目录改用
+  `mode: 0o700` 创建。两条路径都是 best-effort：无法表达属主概念的文件系统（FAT、部分网络
+  共享）不会因此让保存失败。实测收紧后 ACL 只剩 `HORUSX1\<user>` 一项。
+  文档同步改成平台准确的措辞，不再笼统写「0600」。
+
+- **配置文件权限的文档承诺与实现对齐**：`SECURITY.md`、`README.md`、`README.en.md`、
+  `CONTRIBUTING.md`、`AGENTS.md` 与 `client/client.js` 里 7 处「0600」都改成了
+  「仅属主可读写」并注明两个平台各自的实现方式。
+
 ## [0.7.3] - 2026-09-30
 
 ### Added

@@ -38,7 +38,7 @@ const ctx = new Context()
 const tools = new StubToolsRegistry()
 ctx.provide('tools', tools)
 
-const config = plugin.Config({ provider: 'osm', timeoutMs: 20000, defaultMode: 'driving', language: 'zh' })
+const config = plugin.Config({ provider: 'osm', timeoutMs: 20000, language: 'zh' })
 plugin.apply(ctx, config)
 
 const byName = Object.fromEntries(tools.registered.map((t) => [t.name, t]))
