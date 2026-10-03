@@ -34,7 +34,7 @@
 - [架构](#架构)
 - [FAQ](#faq)
 - [开发](#开发)
-- [发布](#发布)
+- [发布](#发布)（完整流程见 [RELEASING.md](RELEASING.md)）
 - [安全](#安全)
 - [贡献](#贡献)
 - [许可](#许可)
@@ -363,6 +363,8 @@ pnpm hooks                            # 安装 pre-commit 密钥守卫
 
 ## 发布
 
+完整流程、失败处理与恢复步骤见 **[RELEASING.md](RELEASING.md)**。简述：**合并版本 PR → 打 tag → CI staging → 你 2FA 批准 → 把草稿 Release 转正。**
+
 发布由 CI 执行（[`.github/workflows/release.yml`](.github/workflows/release.yml)），而且**是两段式——第二段必须由人来做**：
 
 ```sh
@@ -377,11 +379,13 @@ gh release edit vX.Y.Z --draft=false
 
 为什么两段式：npm 的 **trusted publisher 只授权 staged publishing**（`npm publish` 不在允许动作里），所以工作流自己没有能力把包推到所有人面前——tag 表示"这是候选发布"，2FA 那一下才表示"这就是发布"。一次性配置（npm 包的 Trusted publishing 加一条 GitHub Actions 连接、`allowed actions` 不勾 `npm publish`）见 release.yml 顶部注释。
 
-没有 CI、或要手动发布时，同一套动作用本地脚本：
+> ⚠️ **不要用本地 `npm publish` 代替这条路。** 直发的版本没有 provenance，而 npm 不允许已发布版本再次 staging，所以**那个版本无法补救**——之后每次推它的 tag 都会让 release run 变红（工作流里有一步专查这件事）。唯一的修法是换一个版本号重发。
+
+没有 CI、或 CI 不可用时的本地等价物（默认就是两段式）：
 
 ```sh
-node scripts/publish.mjs                  # 直发：构建 → 测试 → 打包检查 → publish → 验证可安装
-node scripts/publish.mjs --stage          # 两段式：只 staging，等 2FA 批准
+node scripts/publish.mjs                  # 默认两段式：只 staging，等 2FA 批准
+node scripts/publish.mjs --direct         # ⚠️ 直发：版本立刻公开，且永远拿不到 provenance
 node scripts/publish.mjs --verify-only    # 只验证某个版本"真的能装上"（含 sha1 对照）
 ```
 

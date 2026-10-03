@@ -53,10 +53,12 @@ PLAN.md
 RELEASE-STATUS.md
 
 # docs/ 是本地材料目录：默认整个目录不进版本控制（曾把内部的思路性文档误提交过一次，
-# 已从历史剔除）。已跟踪的三个例外是历史遗留，保留不动；以后新增的 docs 文件一律忽略。
+# 已从历史剔除）。下面列出的例外进版本控制——因为 README 会链接它们，链接不到读者就是死链
+# （0.1.6 兼容性说明曾因此断链）。其余 docs 文件一律忽略。
 docs/**
 !docs/awesome-dsh-plugin-submission.yml
 !docs/dsh-map-tools-v0.1.3兼容性说明.md
+!docs/dsh-map-tools-0.1.6兼容性说明.md
 !docs/开发-热插拔-HMR.md
 
 # 临时工作目录：截图脚本、无头浏览器 profile、打包对照等一次性产物。

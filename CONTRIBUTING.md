@@ -65,9 +65,13 @@ node scripts/config-e2e.mjs   # 配置读写回环
 
 ## 发布
 
-由维护者执行：更新 CHANGELOG → SemVer 提版本 → `git tag -a vX.Y.Z && git push origin vX.Y.Z`（CI 跑闸门后 `npm stage publish`，只 staging）→ 维护者用 2FA 批准（`npm stage approve <stage-id>`，或 npmjs.com → Staged Packages）→ `gh release edit vX.Y.Z --draft=false` 把草稿 Release 转正。
+由维护者执行，完整步骤与失败处理见 **[RELEASING.md](RELEASING.md)**。一句话版本：
 
-无 CI 时的手动等价物：`node scripts/publish.mjs`（直发）/ `--stage`（两段式）/ `--verify-only`（事后核对可安装性）。详见 [AGENTS.md](AGENTS.md)。
+**合并版本 PR → 打 tag → CI staging（此时什么都还没公开）→ 你 2FA 批准 → 把草稿 Release 转正。**
+
+- `master` 有分支保护，版本准备**必须走 PR**（直推会被 CI 状态检查与 PR 要求拦下）。
+- **不要本地 `npm publish`**：直发的版本没有 provenance 且无法补救，之后推它的 tag 会让 release run 变红。原因见 RELEASING.md。
+- 没有 CI / CI 不可用时的等价物是 `node scripts/publish.mjs`（默认两段式），直发需显式 `--direct`。
 
 ## 许可
 

@@ -82,16 +82,19 @@ node scripts/check-runtime.mjs   # 构建产物能在声明的最低 Node 上加
 
 ## 发布流程
 
-发版走 CI（`.github/workflows/release.yml`），而且是**两段式**：
+发版走 CI（`.github/workflows/release.yml`），而且是**两段式**。**完整说明、失败处理与恢复步骤见 [RELEASING.md](RELEASING.md)**；这里只列顺序，改动发版逻辑前请先读那一份。
 
 1. 更新 `CHANGELOG.md`（版本号 + 变更分类 Added/Fixed/Changed/Removed）。
 2. 按 SemVer 提升 `package.json` 版本（tag 与 `package.json` 必须一致，CI 会拦）。
 3. `pnpm run build && pnpm test` 全绿。
-4. `git tag -a vX.Y.Z && git push origin vX.Y.Z`：CI 跑闸门（build / test / smoke / check-tarball）后执行 `npm stage publish`，**只 staging**（此时谁都装不到），并留下一个**草稿** Release。
-5. 维护者用 2FA 批准：`npm stage list dsh-map-tools` → `npm stage approve <stage-id>`（或 npmjs.com → Staged Packages），再 `gh release edit vX.Y.Z --draft=false` 把草稿转正。CI 的 run summary 会打印这三条命令。
-6. 手动/无 CI 时的等价物：`node scripts/publish.mjs`（直发）/ `--stage`（两段式）/ `--verify-only`（事后核对可安装性）。
+4. **走 PR 合并到 `master`**——分支保护要求 PR + required status checks，直推会被拒。
+5. 在合并提交上 `git tag -a vX.Y.Z -m "dsh-map-tools vX.Y.Z" && git push origin vX.Y.Z`：CI 跑闸门（build / test / smoke / check-tarball）后执行 `npm stage publish`，**只 staging**（此时谁都装不到），并留下一个**草稿** Release。**推 tag 不受分支保护影响。**
+6. 维护者用 2FA 批准：`npm stage list dsh-map-tools` → `npm stage approve <stage-id>`（或 npmjs.com → Staged Packages），再 `gh release edit vX.Y.Z --draft=false` 把草稿转正。CI 的 run summary 会打印这几条命令。
+7. 手动/无 CI 时的等价物：`node scripts/publish.mjs`（**默认两段式**）/ `--direct`（直发，见下）/ `--verify-only`（事后核对可安装性）。
 
+- **不要本地直发。** 直发的版本没有 provenance，而 npm 不允许已发布版本再次 staging，所以**该版本无法补救**，之后每次推它的 tag 都会让 release run 变红。`release.yml` 里的 `unprovenanced` 检查就是为此存在的；`workflow_dispatch` + `acknowledge_unprovenanced` 是给已经发生的意外留的唯一出口，且 tag 触发满足不了它。
 - 一次性配置：npm 包的 Trusted publishing 需要一条 GitHub Actions 连接（repository `dsh-map-tools`、workflow `release.yml`、**`allowed actions` 不勾 `npm publish`**），见 `release.yml` 顶部注释。
+- 所有 `uses:` 都 pin 到 commit SHA（`release` job 持有 `contents: write`）。Dependabot 每周升这些 pin，不要关。
 - "发布成功"的判据只有一条：**全新缓存 + `--prefer-online` 真能拉到 tarball**（并与本地构建产物对照 sha1）。网站上的 `Published` 和 `npm view` 都比 tarball 传播得早，**不能**当"能装上"的判据。
 
 ## 提交信息规范
