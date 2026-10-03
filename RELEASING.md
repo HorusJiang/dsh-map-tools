@@ -116,9 +116,18 @@ npm 的 trusted publisher 对这个包**只授权 staged publishing**——`npm 
 
 要让一次**已经发生**的直发不阻塞后续：手动触发 workflow
 
-> Actions → release → Run workflow → 勾选 `acknowledge_unprovenanced`
+> Actions → release → **Run workflow** → 把 **Use workflow from** 选成**那个 tag**（不是默认分支）
+> → 勾选 `acknowledge_unprovenanced`
+
+⚠️ **必须选 tag。** `github.ref_name` 取的是你选的那个 ref，而 workflow 第一步就会拿它跟
+`package.json` 的版本比对——选中默认分支（这是下拉框的默认行为）会在**校验阶段**就失败
+（`tag master does not match package.json version …`），根本走不到那个勾选框。
 
 tag 推送**满足不了**这个输入（`inputs` 在 tag 触发时为空），所以常规发布保持严格。这个开关是给意外准备的，不是常规路径。
+
+⚠️ **这条闸门红的时候不会产生草稿 Release。** 建 Release 的 job 写着 `needs: stage`，而
+`stage` 在这里失败了，所以它整个被跳过。如果你仍想要一个 GitHub Release，得手工建
+（正文取 CHANGELOG 里该版本的小节）。
 
 > 历史记录：`dsh-map-tools@0.7.3` 就是这样发出去的（当天 github.com 的 git 通道连不上，tag 推不出去）。事后补了 tag 与 Release，并且当时还专门给 workflow 加了一步「已发布就跳过 staging」来让它不变红。**那一步在 2026-10-03 被换成 provenance 检查**——因为「在 registry 上」并不等于「我们 stage 过」，而旧判断把这个区别抹掉了。
 

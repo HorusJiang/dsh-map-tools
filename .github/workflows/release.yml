@@ -17,10 +17,15 @@ name: release
 # put a package in front of the world on its own. The tag says "this is a release
 # candidate"; the 2FA prompt is what says "and this is a release".
 #
-# A tag is still the only thing that triggers this. There is deliberately no
-# `workflow_dispatch`: `npm stage publish` uploads whatever package.json says, so a
-# manual trigger would be a path to staging a version nobody tagged, and the version
-# check below closes that by construction rather than by remembering.
+# A tag is what triggers a real release. There is one manual path, and it exists only
+# because a version that reached the registry outside this workflow cannot be taken
+# back: `workflow_dispatch` with a required `acknowledge_unprovenanced` boolean, which
+# lets a maintainer say by hand that they know the version they tagged is unattested.
+# It defaults to false, and a tag push can never satisfy it (`inputs` is empty there),
+# so the strict path stays strict. The version check below still applies to a manual
+# run — which is why a manual run must be dispatched **on the tag**, not on the
+# default branch: `github.ref_name` is whatever ref you pick, and a branch name would
+# fail the tag/manifest comparison before the acknowledgement is ever consulted.
 #
 # ## One-time setup, on the npm side
 #
@@ -174,10 +179,14 @@ jobs:
             echo
             echo "- If this tag is the release: bump to the next patch, re-tag, and let this"
             echo "  workflow stage it. Versions from here on will carry provenance."
-            echo "- If the tag is only there to record an already-public version, run this"
-            echo "  workflow by hand (Actions -> release -> Run workflow) with"
-            echo "  \`acknowledge_unprovenanced\` checked. The draft Release below is fine"
-            echo "  either way."
+            echo "- If the tag only records an already-public version and you want the run to"
+            echo "  stop failing: Actions -> release -> Run workflow, set **Use workflow from**"
+            echo "  to this tag (not the default branch - the tag/manifest check runs first),"
+            echo "  and tick \`acknowledge_unprovenanced\`."
+            echo
+            echo "Either way **no draft Release was created by this run**: the job that creates"
+            echo "it needs this one, so a red run here skips it. Create the Release by hand if"
+            echo "you still want one (the changelog section for this version is the body)."
           } >> "$GITHUB_STEP_SUMMARY"
           exit 1
 

@@ -117,7 +117,12 @@ function metadataVisible() {
   }
 }
 
-/** 两段式发布后，人要做的两步。 */
+/**
+ * 本地 staging 之后，人还要做的两步。
+ *
+ * 这里**没有** `gh release edit`：本地 staging 不经过 CI，所以不会留下草稿 Release
+ * （那是 workflow 的 release job 干的）。本地这条路如果要 GitHub Release，得手工建。
+ */
 function printApprovalHint() {
   console.log(`  npm stage list ${pkg.name}`)
   console.log('  npm stage approve <stage-id>          # 会要 2FA；npmjs.com → Staged Packages 也行')
