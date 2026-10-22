@@ -16,6 +16,7 @@
   <a href="https://github.com/HorusJiang/dsh-map-tools/releases"><img src="https://img.shields.io/github/v/release/HorusJiang/dsh-map-tools?style=flat-square&label=release" alt="Release"></a>
   <a href="https://github.com/topics/dsh-plugin"><img src="https://img.shields.io/badge/dsh--plugin-%E5%8F%AF%E5%AE%89%E8%A3%85-2A6BE8?style=flat-square" alt="dsh-plugin"></a>
   <a href="https://github.com/awesome-dsh-plugin/awesome-dsh-plugin"><img src="https://img.shields.io/badge/dshmarket-%E6%94%B6%E5%BD%95-22C55E?style=flat-square&logo=shopify&logoColor=white" alt="dshmarket"></a>
+  <a href="https://dsh-plugin.org/plugins/horusjiang/dsh-map-tools"><img src="https://dsh-plugin.org/badges/listed.svg" alt="Listed on dsh-plugin.org"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js >= 20">
 </p>
 
