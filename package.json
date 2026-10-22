@@ -64,6 +64,7 @@
     "@deepseek-ai/schemastery": "^3.18.2",
     "@types/node": "^26.6.3",
     "typescript": "^7.0.2",
+    "vite": "^8.3.4",
     "vitest": "^5.0.3"
   },
   "publishConfig": {
